@@ -80,46 +80,35 @@
               <el-icon><Aim /></el-icon>
               AI 分析
             </el-button>
-            <el-button type="warning" size="small" @click="aiAnnotate" :disabled="!analysisResult">
+            <el-divider direction="vertical" />
+            <el-button type="warning" size="small" @click="aiAutoAnnotate" :disabled="!analysisResult">
               <el-icon><MagicStick /></el-icon>
               AI 标注
             </el-button>
-            <el-button 
-              :type="annotationMode ? 'danger' : 'info'" 
-              size="small" 
-              @click="toggleAnnotationMode"
-              :disabled="!analysisResult"
-            >
-              <el-icon><EditPen /></el-icon>
-              {{ annotationMode ? '退出标注' : '标注模式' }}
+            <el-dropdown @command="handleAnnotationTypeChange">
+              <el-button size="small" :type="selectedAnnotationType ? 'primary' : ''">
+                <el-icon><EditPen /></el-icon>
+                {{ selectedAnnotationType ? getAnnotationTypeName(selectedAnnotationType) : '选择标注类型' }}
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="P_WAVE">P波</el-dropdown-item>
+                  <el-dropdown-item command="QRS_COMPLEX">QRS波群</el-dropdown-item>
+                  <el-dropdown-item command="T_WAVE">T波</el-dropdown-item>
+                  <el-dropdown-item command="ST_SEGMENT">ST段</el-dropdown-item>
+                  <el-dropdown-item command="ABNORMAL_POINT">异常点</el-dropdown-item>
+                  <el-dropdown-item command="OTHER">其他</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button size="small" @click="clearAnnotations" :disabled="!annotations.length">
+              <el-icon><Delete /></el-icon>
+              清除标注
             </el-button>
           </el-space>
         </div>
       </template>
-      
-      <!-- 标注工具栏 -->
-      <div v-if="annotationMode" class="annotation-toolbar">
-        <el-space wrap>
-          <span class="toolbar-label">标注类型:</span>
-          <el-radio-group v-model="currentAnnotationType" size="small">
-            <el-radio-button value="P_WAVE">P波</el-radio-button>
-            <el-radio-button value="QRS_COMPLEX">QRS波</el-radio-button>
-            <el-radio-button value="T_WAVE">T波</el-radio-button>
-            <el-radio-button value="ST_SEGMENT">ST段</el-radio-button>
-            <el-radio-button value="ABNORMAL_POINT">异常点</el-radio-button>
-            <el-radio-button value="OTHER">其他</el-radio-button>
-          </el-radio-group>
-          <el-divider direction="vertical" />
-          <el-button size="small" @click="showAnnotationHistory">
-            <el-icon><List /></el-icon>
-            标注历史
-          </el-button>
-          <el-button size="small" @click="showAnnotationStats">
-            <el-icon><DataAnalysis /></el-icon>
-            统计分析
-          </el-button>
-        </el-space>
-      </div>
       
       <v-chart 
         ref="ecgChartRef"
@@ -128,6 +117,49 @@
         style="height: 400px"
         @click="handleChartClick"
       />
+      
+      <!-- 标注列表面板 -->
+      <el-collapse v-if="annotations.length > 0" v-model="activeAnnotationCollapse" style="margin-top: 20px">
+        <el-collapse-item title="标注列表" name="1">
+          <el-table :data="annotations" stripe max-height="300">
+            <el-table-column prop="annotationType" label="类型" width="120">
+              <template #default="{ row }">
+                <el-tag :color="getAnnotationColor(row.annotationType)" effect="dark" size="small">
+                  {{ getAnnotationTypeName(row.annotationType) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="label" label="标签" width="100" />
+            <el-table-column prop="timestampMs" label="时间点" width="120">
+              <template #default="{ row }">
+                {{ (row.timestampMs / 1000).toFixed(2) }}s
+              </template>
+            </el-table-column>
+            <el-table-column prop="confidence" label="置信度" width="100">
+              <template #default="{ row }">
+                {{ row.confidence ? (row.confidence * 100).toFixed(1) + '%' : '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="isAiGenerated" label="来源" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.isAiGenerated ? 'success' : 'info'" size="small">
+                  {{ row.isAiGenerated ? 'AI' : '手动' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" @click="editAnnotation(row)">
+                  编辑
+                </el-button>
+                <el-button link type="danger" size="small" @click="deleteAnnotationItem(row.id)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-collapse-item>
+      </el-collapse>
     </el-card>
 
     <!-- 生理参数详情 -->
@@ -279,111 +311,39 @@
         style="margin-top: 20px; justify-content: flex-end"
       />
     </el-card>
-    
-    <!-- 标注历史对话框 -->
-    <el-dialog
-      v-model="annotationHistoryVisible"
-      title="标注历史"
-      width="800px"
-    >
-      <el-table :data="annotationHistoryList" stripe max-height="400">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column label="类型" width="120">
-          <template #default="{ row }">
-            <el-tag size="small">{{ getAnnotationTypeName(row.annotationType) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="label" label="标签" width="120" />
-        <el-table-column label="时间戳" width="120">
-          <template #default="{ row }">
-            {{ row.timestampMs }}ms
-          </template>
-        </el-table-column>
-        <el-table-column label="置信度" width="100">
-          <template #default="{ row }">
-            {{ row.confidence ? (row.confidence * 100).toFixed(1) + '%' : '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="来源" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.isAiGenerated === 1 ? 'success' : 'info'" size="small">
-              {{ row.isAiGenerated === 1 ? 'AI' : '手动' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180" />
-        <el-table-column label="操作" fixed="right" width="150">
-          <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="editAnnotation(row)">
-              编辑
-            </el-button>
-            <el-button link type="danger" size="small" @click="deleteAnnotationItem(row)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
-    
-    <!-- 标注统计对话框 -->
-    <el-dialog
-      v-model="annotationStatsVisible"
-      title="标注统计分析"
-      width="600px"
-    >
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="总标注数">
-          {{ annotationStats.totalCount || 0 }}
-        </el-descriptions-item>
-        <el-descriptions-item label="AI生成">
-          {{ annotationStats.aiGeneratedCount || 0 }}
-        </el-descriptions-item>
-        <el-descriptions-item label="手动标注">
-          {{ annotationStats.manualCount || 0 }}
-        </el-descriptions-item>
-      </el-descriptions>
-      
-      <h4 style="margin-top: 20px">按类型分布</h4>
-      <el-table :data="annotationTypeStatsList" stripe>
-        <el-table-column label="类型">
-          <template #default="{ row }">
-            {{ getAnnotationTypeName(row.type) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="count" label="数量" />
-      </el-table>
-    </el-dialog>
-    
-    <!-- 编辑标注视图对话框 -->
-    <el-dialog
-      v-model="editAnnotationVisible"
-      title="编辑标注"
-      width="500px"
-    >
-      <el-form :model="editingAnnotation" label-width="100px">
-        <el-form-item label="标注类型">
-          <el-select v-model="editingAnnotation.annotationType" style="width: 100%">
-            <el-option label="P波" value="P_WAVE" />
-            <el-option label="QRS波群" value="QRS_COMPLEX" />
-            <el-option label="T波" value="T_WAVE" />
-            <el-option label="ST段" value="ST_SEGMENT" />
-            <el-option label="异常点" value="ABNORMAL_POINT" />
-            <el-option label="其他" value="OTHER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-input v-model="editingAnnotation.label" placeholder="输入标签描述" />
-        </el-form-item>
-        <el-form-item label="时间戳(ms)">
-          <el-input-number v-model="editingAnnotation.timestampMs" :min="0" style="width: 100%" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editAnnotationVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveAnnotationEdit">保存</el-button>
-      </template>
-    </el-dialog>
   </div>
+  
+  <!-- 标注编辑对话框 -->
+  <el-dialog v-model="annotationDialogVisible" title="编辑标注" width="500px">
+    <el-form :model="annotationForm" label-width="100px">
+      <el-form-item label="标注类型">
+        <el-select v-model="annotationForm.annotationType" style="width: 100%">
+          <el-option label="P波" value="P_WAVE" />
+          <el-option label="QRS波群" value="QRS_COMPLEX" />
+          <el-option label="T波" value="T_WAVE" />
+          <el-option label="ST段" value="ST_SEGMENT" />
+          <el-option label="异常点" value="ABNORMAL_POINT" />
+          <el-option label="其他" value="OTHER" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="标签">
+        <el-input v-model="annotationForm.label" placeholder="输入标签描述" />
+      </el-form-item>
+      <el-form-item label="时间点">
+        <el-input-number 
+          v-model="annotationForm.timestampMs" 
+          :min="0" 
+          :step="10"
+          style="width: 100%"
+        />
+        <span style="margin-left: 10px; color: #909399">ms</span>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="annotationDialogVisible = false">取消</el-button>
+      <el-button type="primary" @click="saveAnnotation">保存</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -393,10 +353,13 @@ import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, DataZoomComponent } from 'echarts/components'
-import { ElMessage } from 'element-plus'
-import { Monitor, Waveform, Timer, Connection, VideoPlay, VideoPause, Aim, Refresh, MagicStick, EditPen, List, DataAnalysis } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { 
+  Monitor, Waveform, Timer, Connection, VideoPlay, VideoPause, Aim, Refresh,
+  MagicStick, EditPen, Delete, ArrowDown
+} from '@element-plus/icons-vue'
 import axios from 'axios'
-import * as ecgAnnotationApi from '@/api/ecg-annotation'
+import * as ecgApi from '@/api/ecg'
 
 // 按需引入 ECharts 组件
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, DataZoomComponent])
@@ -414,23 +377,6 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const totalRecords = ref(0)
 
-// 标注相关数据
-const annotationMode = ref(false)
-const currentAnnotationType = ref('P_WAVE')
-const annotations = ref<ecgAnnotationApi.EcgAnnotation[]>([])
-const annotationHistoryVisible = ref(false)
-const annotationHistoryList = ref<ecgAnnotationApi.EcgAnnotation[]>([])
-const annotationStatsVisible = ref(false)
-const annotationStats = ref<ecgAnnotationApi.AnnotationStatistics>({
-  totalCount: 0,
-  typeStatistics: {},
-  aiGeneratedCount: 0,
-  manualCount: 0
-})
-const annotationTypeStatsList = ref<Array<{ type: string; count: number }>>([])
-const editAnnotationVisible = ref(false)
-const editingAnnotation = ref<Partial<ecgAnnotationApi.EcgAnnotation>>({})
-
 const ecgParams = ref({
   prInterval: null,
   qrsDuration: null,
@@ -446,8 +392,35 @@ let reconnectTimer: any = null
 const maxReconnectAttempts = 5
 let reconnectAttempts = 0
 
+// 标注相关数据
+const annotations = ref<any[]>([])
+const selectedAnnotationType = ref<string>('')
+const activeAnnotationCollapse = ref(['1'])
+const annotationDialogVisible = ref(false)
+const annotationForm = ref({
+  id: null as number | null,
+  userId: 1,
+  analysisResultId: 0,
+  timestampMs: 0,
+  annotationType: 'P_WAVE',
+  label: '',
+  confidence: null as number | null,
+  isAiGenerated: 0,
+  createdBy: 1
+})
+
 // ECG 图表配置
-const ecgChartOption = computed(() => ({
+const ecgChartOption = computed(() => {
+  // 准备标注数据
+  const markPoints = annotations.value.map(ann => ({
+    coord: [ann.timestampMs / 4, ann.value || 0], // 假设采样率250Hz,每4ms一个点
+    value: ann.label || getAnnotationTypeName(ann.annotationType),
+    itemStyle: {
+      color: getAnnotationColor(ann.annotationType)
+    }
+  }))
+  
+  return {
   tooltip: {
     trigger: 'axis',
     formatter: (params: any) => {
@@ -500,27 +473,34 @@ const ecgChartOption = computed(() => ({
     name: 'ECG',
     type: 'line',
     smooth: false,
-    symbol: 'none',
-    sampling: 'lttb',
-    itemStyle: {
-      color: '#409eff'
-    },
-    lineStyle: {
-      width: 1.5
-    },
+    showSymbol: false,
     data: ecgData.value,
-    // 添加标注点
-    markPoint: annotationMode.value ? {
-      data: annotations.value.map(ann => ({
-        coord: [ann.timestampMs.toString(), 0],
-        value: ann.label || ann.annotationType,
-        itemStyle: {
-          color: getAnnotationColor(ann.annotationType)
-        }
-      }))
-    } : undefined
+    lineStyle: {
+      color: '#409eff',
+      width: 2
+    },
+    areaStyle: {
+      color: {
+        type: 'linear',
+        x: 0, y: 0, x2: 0, y2: 1,
+        colorStops: [
+          { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
+          { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
+        ]
+      }
+    },
+    markPoint: {
+      data: markPoints,
+      symbol: 'pin',
+      symbolSize: 50,
+      label: {
+        show: true,
+        fontSize: 10
+      }
+    }
   }]
-}))
+}
+})
 
 // 计算属性
 const connectionText = computed(() => {
@@ -699,186 +679,6 @@ const stopRecording = () => {
   ElMessage.info('停止记录')
 }
 
-/**
- * 切换标注模式
- */
-const toggleAnnotationMode = () => {
-  annotationMode.value = !annotationMode.value
-  if (annotationMode.value) {
-    ElMessage.success('已进入标注模式,点击波形图进行标注')
-    // 加载当前分析结果的标注
-    if (analysisResult.value) {
-      loadAnnotations(analysisResult.value.id)
-    }
-  } else {
-    ElMessage.info('已退出标注模式')
-  }
-}
-
-/**
- * AI自动标注
- */
-const aiAnnotate = async () => {
-  if (!analysisResult.value) {
-    ElMessage.warning('请先进行AI分析')
-    return
-  }
-  
-  try {
-    const response = await ecgAnnotationApi.aiAutoAnnotate(analysisResult.value.id, 1) // TODO: 从用户Store获取userId
-    annotations.value = response.data.data
-    ElMessage.success(`AI标注完成,共生成${annotations.value.length}个标注点`)
-    
-    // 刷新图表显示标注
-    updateChartAnnotations()
-  } catch (error: any) {
-    console.error('AI标注失败:', error)
-    ElMessage.error(error.response?.data?.message || 'AI标注失败')
-  }
-}
-
-/**
- * 处理图表点击事件(创建标注)
- */
-const handleChartClick = (params: any) => {
-  if (!annotationMode.value || !analysisResult.value) {
-    return
-  }
-  
-  // 获取点击位置的时间戳(毫秒)
-  const timestampMs = Math.round(params.dataIndex * (1000 / sampleRate.value))
-  
-  // 创建标注
-  const newAnnotation: ecgAnnotationApi.EcgAnnotation = {
-    userId: 1, // TODO: 从用户Store获取
-    analysisResultId: analysisResult.value.id,
-    timestampMs: timestampMs,
-    annotationType: currentAnnotationType.value,
-    label: getAnnotationLabel(currentAnnotationType.value),
-    isAiGenerated: 0,
-    createdBy: 1 // TODO: 从用户Store获取
-  }
-  
-  ecgAnnotationApi.createAnnotation(newAnnotation)
-    .then(response => {
-      annotations.value.push(response.data.data)
-      ElMessage.success('标注创建成功')
-      updateChartAnnotations()
-    })
-    .catch(error => {
-      console.error('创建标注失败:', error)
-      ElMessage.error(error.response?.data?.message || '创建标注失败')
-    })
-}
-
-/**
- * 加载标注
- */
-const loadAnnotations = async (analysisResultId: number) => {
-  try {
-    const response = await ecgAnnotationApi.getAnnotationsByResultId(analysisResultId)
-    annotations.value = response.data.data
-    updateChartAnnotations()
-  } catch (error: any) {
-    console.error('加载标注失败:', error)
-  }
-}
-
-/**
- * 更新图表标注显示
- */
-const updateChartAnnotations = () => {
-  // ECharts会自动响应ecgChartOption的变化
-  // 这里只需要触发重新计算即可
-}
-
-/**
- * 显示标注历史
- */
-const showAnnotationHistory = async () => {
-  try {
-    const response = await ecgAnnotationApi.getUserAnnotationHistory(1, 1, 50) // TODO: 从用户Store获取userId
-    annotationHistoryList.value = response.data.data
-    annotationHistoryVisible.value = true
-  } catch (error: any) {
-    console.error('加载标注历史失败:', error)
-    ElMessage.error('加载标注历史失败')
-  }
-}
-
-/**
- * 显示标注统计
- */
-const showAnnotationStats = async () => {
-  try {
-    const response = await ecgAnnotationApi.getUserAnnotationStatistics(1) // TODO: 从用户Store获取userId
-    annotationStats.value = response.data.data
-    
-    // 转换为表格数据
-    annotationTypeStatsList.value = Object.entries(annotationStats.value.typeStatistics).map(([type, count]) => ({
-      type,
-      count
-    }))
-    
-    annotationStatsVisible.value = true
-  } catch (error: any) {
-    console.error('加载标注统计失败:', error)
-    ElMessage.error('加载标注统计失败')
-  }
-}
-
-/**
- * 编辑标注
- */
-const editAnnotation = (annotation: ecgAnnotationApi.EcgAnnotation) => {
-  editingAnnotation.value = { ...annotation }
-  editAnnotationVisible.value = true
-}
-
-/**
- * 保存标注编辑
- */
-const saveAnnotationEdit = async () => {
-  if (!editingAnnotation.value.id) {
-    ElMessage.error('标注ID不存在')
-    return
-  }
-  
-  try {
-    await ecgAnnotationApi.updateAnnotation(editingAnnotation.value.id, editingAnnotation.value)
-    ElMessage.success('标注更新成功')
-    editAnnotationVisible.value = false
-    
-    // 刷新标注列表
-    if (analysisResult.value) {
-      loadAnnotations(analysisResult.value.id)
-    }
-    showAnnotationHistory()
-  } catch (error: any) {
-    console.error('更新标注失败:', error)
-    ElMessage.error(error.response?.data?.message || '更新标注失败')
-  }
-}
-
-/**
- * 删除标注
- */
-const deleteAnnotationItem = async (annotation: ecgAnnotationApi.EcgAnnotation) => {
-  try {
-    await ecgAnnotationApi.deleteAnnotation(annotation.id!, 1) // TODO: 从用户Store获取userId
-    ElMessage.success('标注删除成功')
-    
-    // 刷新标注列表
-    if (analysisResult.value) {
-      loadAnnotations(analysisResult.value.id)
-    }
-    showAnnotationHistory()
-  } catch (error: any) {
-    console.error('删除标注失败:', error)
-    ElMessage.error(error.response?.data?.message || '删除标注失败')
-  }
-}
-
 const analyzeCurrent = async () => {
   if (!ecgData.value.length) {
     ElMessage.warning('请先记录ECG数据')
@@ -900,6 +700,9 @@ const analyzeCurrent = async () => {
     
     // 更新心电参数
     updateEcgParams()
+    
+    // 加载该分析结果的标注
+    loadAnnotations()
     
     ElMessage.success('分析完成')
   } catch (error: any) {
@@ -1056,11 +859,13 @@ const getQualityColor = (quality: number) => {
   return '#f56c6c'
 }
 
+// ========== 标注相关方法 ==========
+
 /**
  * 获取标注类型名称
  */
 const getAnnotationTypeName = (type: string) => {
-  const typeMap: Record<string, string> = {
+  const names: Record<string, string> = {
     'P_WAVE': 'P波',
     'QRS_COMPLEX': 'QRS波群',
     'T_WAVE': 'T波',
@@ -1068,14 +873,14 @@ const getAnnotationTypeName = (type: string) => {
     'ABNORMAL_POINT': '异常点',
     'OTHER': '其他'
   }
-  return typeMap[type] || type
+  return names[type] || type
 }
 
 /**
  * 获取标注颜色
  */
 const getAnnotationColor = (type: string) => {
-  const colorMap: Record<string, string> = {
+  const colors: Record<string, string> = {
     'P_WAVE': '#67c23a',
     'QRS_COMPLEX': '#f56c6c',
     'T_WAVE': '#409eff',
@@ -1083,22 +888,173 @@ const getAnnotationColor = (type: string) => {
     'ABNORMAL_POINT': '#f56c6c',
     'OTHER': '#909399'
   }
-  return colorMap[type] || '#409eff'
+  return colors[type] || '#409eff'
 }
 
 /**
- * 获取标注默认标签
+ * 处理标注类型选择
  */
-const getAnnotationLabel = (type: string) => {
-  const labelMap: Record<string, string> = {
-    'P_WAVE': 'P',
-    'QRS_COMPLEX': 'QRS',
-    'T_WAVE': 'T',
-    'ST_SEGMENT': 'ST',
-    'ABNORMAL_POINT': '异常',
-    'OTHER': ''
+const handleAnnotationTypeChange = (type: string) => {
+  selectedAnnotationType.value = type
+  ElMessage.info(`已选择标注类型: ${getAnnotationTypeName(type)}`)
+}
+
+/**
+ * 处理图表点击事件 - 创建标注
+ */
+const handleChartClick = async (params: any) => {
+  if (!selectedAnnotationType.value) {
+    ElMessage.warning('请先选择标注类型')
+    return
   }
-  return labelMap[type] || ''
+  
+  if (!analysisResult.value) {
+    ElMessage.warning('请先进行AI分析')
+    return
+  }
+  
+  // 计算时间戳(毫秒)
+  const timestampMs = params.dataIndex * 4 // 假设采样率250Hz,每4ms一个点
+  
+  try {
+    const response = await ecgApi.createAnnotation({
+      userId: 1,
+      analysisResultId: analysisResult.value.id,
+      timestampMs,
+      annotationType: selectedAnnotationType.value,
+      label: getAnnotationTypeName(selectedAnnotationType.value),
+      isAiGenerated: 0,
+      createdBy: 1
+    })
+    
+    annotations.value.push(response.data)
+    ElMessage.success('标注创建成功')
+    
+    // 刷新标注列表
+    loadAnnotations()
+  } catch (error: any) {
+    console.error('创建标注失败:', error)
+    ElMessage.error(error.response?.data?.message || '创建标注失败')
+  }
+}
+
+/**
+ * 加载标注列表
+ */
+const loadAnnotations = async () => {
+  if (!analysisResult.value) return
+  
+  try {
+    const response = await ecgApi.getAnnotationsByResultId(analysisResult.value.id)
+    annotations.value = response.data
+  } catch (error) {
+    console.error('加载标注失败:', error)
+  }
+}
+
+/**
+ * AI自动标注
+ */
+const aiAutoAnnotate = async () => {
+  if (!analysisResult.value) {
+    ElMessage.warning('请先进行AI分析')
+    return
+  }
+  
+  try {
+    ElMessage.info('正在进行AI自动标注...')
+    
+    const response = await ecgApi.aiAutoAnnotate(analysisResult.value.id, 1)
+    annotations.value = response.data
+    
+    ElMessage.success(`AI标注完成,共生成${annotations.value.length}个标注点`)
+  } catch (error: any) {
+    console.error('AI标注失败:', error)
+    ElMessage.error(error.response?.data?.message || 'AI标注失败')
+  }
+}
+
+/**
+ * 编辑标注
+ */
+const editAnnotation = (annotation: any) => {
+  annotationForm.value = { ...annotation }
+  annotationDialogVisible.value = true
+}
+
+/**
+ * 保存标注
+ */
+const saveAnnotation = async () => {
+  try {
+    if (annotationForm.value.id) {
+      // 更新现有标注
+      await ecgApi.updateAnnotation(annotationForm.value.id, {
+        label: annotationForm.value.label,
+        confidence: annotationForm.value.confidence
+      })
+      ElMessage.success('标注更新成功')
+    } else {
+      // 创建新标注
+      await ecgApi.createAnnotation(annotationForm.value)
+      ElMessage.success('标注创建成功')
+    }
+    
+    annotationDialogVisible.value = false
+    loadAnnotations()
+  } catch (error: any) {
+    console.error('保存标注失败:', error)
+    ElMessage.error(error.response?.data?.message || '保存标注失败')
+  }
+}
+
+/**
+ * 删除标注
+ */
+const deleteAnnotationItem = async (annotationId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要删除此标注吗?', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await ecgApi.deleteAnnotation(annotationId, 1)
+    ElMessage.success('标注删除成功')
+    
+    loadAnnotations()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除标注失败:', error)
+      ElMessage.error(error.response?.data?.message || '删除标注失败')
+    }
+  }
+}
+
+/**
+ * 清除所有标注
+ */
+const clearAnnotations = async () => {
+  try {
+    await ElMessageBox.confirm('确定要清除所有标注吗?此操作不可恢复。', '警告', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    // 批量删除
+    for (const ann of annotations.value) {
+      await ecgApi.deleteAnnotation(ann.id, 1)
+    }
+    
+    annotations.value = []
+    ElMessage.success('已清除所有标注')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('清除标注失败:', error)
+      ElMessage.error('清除标注失败')
+    }
+  }
 }
 
 // 生命周期
@@ -1218,32 +1174,6 @@ onUnmounted(() => {
         background: #f5f7fa;
         border-radius: 4px;
         color: #606266;
-      }
-    }
-  }
-  
-  // 标注工具栏样式
-  .annotation-toolbar {
-    padding: 15px;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    border-radius: 8px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    
-    .toolbar-label {
-      font-weight: bold;
-      color: #303133;
-      font-size: 14px;
-    }
-    
-    :deep(.el-radio-button) {
-      &__inner {
-        transition: all 0.3s;
-        
-        &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-        }
       }
     }
   }

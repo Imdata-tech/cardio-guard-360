@@ -1,56 +1,3 @@
-import request from '@/utils/request'
-
-/**
- * ECG心电图分析API
- */
-
-// 分析ECG数据
-export function analyzeEcg(userId: number, deviceId: number, data: {
-  waveform: string
-  sampleRate: number
-}) {
-  return request.post(`/api/ecg/analyze?userId=${userId}&deviceId=${deviceId}`, data)
-}
-
-// 批量分析ECG数据
-export function batchAnalyzeEcg(ecgDataList: Array<{
-  userId: number
-  deviceId: number
-  waveform: string
-  sampleRate: number
-}>) {
-  return request.post('/api/ecg/batch-analyze', ecgDataList)
-}
-
-// 获取用户ECG分析历史
-export function getEcgHistory(userId: number, page: number = 1, size: number = 10) {
-  return request.get('/api/ecg/history', {
-    params: { userId, page, size }
-  })
-}
-
-// 获取分析结果详情
-export function getEcgResult(resultId: number) {
-  return request.get(`/api/ecg/result/${resultId}`)
-}
-
-// 医生审核分析结果
-export function reviewEcgResult(
-  resultId: number,
-  doctorId: number,
-  reviewStatus: string,
-  comment?: string
-) {
-  return request.put(`/api/ecg/review/${resultId}`, null, {
-    params: { doctorId, reviewStatus, comment }
-  })
-}
-
-// 生成ECG诊断报告
-export function getEcgReport(resultId: number) {
-  return request.get(`/api/ecg/report/${resultId}`)
-}
-
 // 统计用户ECG异常情况
 export function getEcgAbnormalStats(
   userId: number,
@@ -59,5 +6,78 @@ export function getEcgAbnormalStats(
 ) {
   return request.get('/api/ecg/statistics/abnormal', {
     params: { userId, startDate, endDate }
+  })
+}
+
+/**
+ * ECG标注管理API (v1.4.0)
+ */
+
+// 创建标注
+export function createAnnotation(data: {
+  userId: number
+  analysisResultId: number
+  timestampMs: number
+  annotationType: string
+  label?: string
+  confidence?: number
+  isAiGenerated?: number
+  createdBy: number
+}) {
+  return request.post('/api/ecg/annotation', data)
+}
+
+// 批量创建标注
+export function batchCreateAnnotations(annotations: Array<{
+  userId: number
+  analysisResultId: number
+  timestampMs: number
+  annotationType: string
+  label?: string
+  confidence?: number
+  isAiGenerated?: number
+  createdBy: number
+}>) {
+  return request.post('/api/ecg/annotation/batch', annotations)
+}
+
+// 更新标注
+export function updateAnnotation(annotationId: number, data: {
+  label?: string
+  confidence?: number
+}) {
+  return request.put(`/api/ecg/annotation/${annotationId}`, data)
+}
+
+// 删除标注
+export function deleteAnnotation(annotationId: number, userId: number) {
+  return request.delete(`/api/ecg/annotation/${annotationId}`, {
+    params: { userId }
+  })
+}
+
+// 查询指定分析结果的标注
+export function getAnnotationsByResultId(analysisResultId: number) {
+  return request.get(`/api/ecg/annotation/result/${analysisResultId}`)
+}
+
+// 查询用户标注历史
+export function getUserAnnotationHistory(userId: number, page: number = 1, size: number = 20) {
+  return request.get('/api/ecg/annotation/history', {
+    params: { userId, page, size }
+  })
+}
+
+// AI自动标注
+export function aiAutoAnnotate(analysisResultId: number, userId: number) {
+  return request.post(`/api/ecg/annotation/ai-annotate/${analysisResultId}`, null, {
+    params: { userId }
+  })
+}
+
+// 查询用户标注统计
+export function getUserAnnotationStatistics(userId: number) {
+  return request.get('/api/ecg/annotation/statistics', {
+    params: { userId }
   })
 }
