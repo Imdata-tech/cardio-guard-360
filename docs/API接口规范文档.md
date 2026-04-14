@@ -1460,7 +1460,7 @@ const loadReport = async (resultId: number) => {
 ```
 
 **前端集成示例 (ECharts 可视化):**
-```vue
+``vue
 <script setup lang="ts">
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
@@ -1534,6 +1534,14 @@ const chartOption = computed(() => ({
 ---
 
 ## 更新日志
+
+### v1.3.1 (2026-04-13)
+- 新增ECG前端集成模块
+- 添加ECG监测页面路由和导航菜单
+- 完善ECG API TypeScript封装 (7个方法)
+- 补充ECharts波形可视化配置说明
+- 添加诊断报告查看和下载功能示例
+- 提供完整的组件测试用例清单
 
 ### v1.3.0 (2026-04-13)
 - 新增ECG心电图分析模块
