@@ -19,7 +19,7 @@
 - **协议**: HTTP/1.1, HTTPS (生产环境)
 - **数据格式**: JSON
 - **字符编码**: UTF-8
-- **API版本**: v1.3.2
+- **API版本**: v1.4.0
 
 ### 1.2 通用响应格式
 
@@ -268,6 +268,335 @@ Authorization: Bearer <token>
   "data": "ECG数据模拟已停止"
 }
 ```
+
+---
+
+### 3.3 ECG标注管理 API ✨ v1.4.0
+
+ECG标注功能允许医生和用户在心电图波形上进行标记,标识P波、QRS波群、T波等关键特征,或标注异常点。
+
+#### 3.3.1 创建标注
+
+```http
+POST /ecg/annotation
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+  "userId": 1,
+  "analysisResultId": 1,
+  "timestampMs": 1000,
+  "annotationType": "P_WAVE",
+  "label": "P",
+  "isAiGenerated": 0,
+  "createdBy": 1
+}
+```
+
+**字段说明:**
+- `userId`: 用户ID (必需)
+- `analysisResultId`: 关联的ECG分析结果ID (必需)
+- `timestampMs`: 标注点的时间戳(毫秒,相对于记录开始) (必需)
+- `annotationType`: 标注类型 (必需)
+  - `P_WAVE` - P波
+  - `QRS_COMPLEX` - QRS波群
+  - `T_WAVE` - T波
+  - `ST_SEGMENT` - ST段
+  - `ABNORMAL_POINT` - 异常点
+  - `OTHER` - 其他
+- `label`: 标注标签/描述 (可选)
+- `confidence`: 标注置信度(0-1, AI自动标注时) (可选)
+- `isAiGenerated`: 是否AI自动生成 (0-手动, 1-AI) (可选,默认0)
+- `createdBy`: 创建者ID (必需)
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "userId": 1,
+    "analysisResultId": 1,
+    "timestampMs": 1000,
+    "annotationType": "P_WAVE",
+    "label": "P",
+    "confidence": null,
+    "isAiGenerated": 0,
+    "createdBy": 1,
+    "createdAt": "2026-04-14T10:30:00",
+    "updatedAt": "2026-04-14T10:30:00"
+  }
+}
+```
+
+#### 3.3.2 批量创建标注
+
+```http
+POST /ecg/annotation/batch
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+[
+  {
+    "userId": 1,
+    "analysisResultId": 1,
+    "timestampMs": 1000,
+    "annotationType": "P_WAVE",
+    "label": "P",
+    "createdBy": 1
+  },
+  {
+    "userId": 1,
+    "analysisResultId": 1,
+    "timestampMs": 1080,
+    "annotationType": "QRS_COMPLEX",
+    "label": "QRS",
+    "createdBy": 1
+  }
+]
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": 2
+}
+```
+
+**说明:** 返回成功创建的标注数量
+
+#### 3.3.3 更新标注
+
+```http
+PUT /ecg/annotation/{annotationId}
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+  "label": "Updated Label",
+  "confidence": 0.95
+}
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "label": "Updated Label",
+    "confidence": 0.95,
+    "updatedAt": "2026-04-14T10:35:00"
+  }
+}
+```
+
+#### 3.3.4 删除标注
+
+```http
+DELETE /ecg/annotation/{annotationId}?userId=1
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "删除成功"
+}
+```
+
+**权限说明:**
+- 只能删除自己创建的标注
+- 尝试删除他人标注将返回403错误
+
+#### 3.3.5 查询指定分析结果的标注
+
+```http
+GET /ecg/annotation/result/{analysisResultId}
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "userId": 1,
+      "analysisResultId": 1,
+      "timestampMs": 1000,
+      "annotationType": "P_WAVE",
+      "label": "P",
+      "confidence": 0.95,
+      "isAiGenerated": 1,
+      "createdBy": 1,
+      "createdAt": "2026-04-14T10:30:00"
+    },
+    {
+      "id": 2,
+      "userId": 1,
+      "analysisResultId": 1,
+      "timestampMs": 1080,
+      "annotationType": "QRS_COMPLEX",
+      "label": "QRS",
+      "confidence": 0.98,
+      "isAiGenerated": 1,
+      "createdBy": 1,
+      "createdAt": "2026-04-14T10:30:00"
+    }
+  ]
+}
+```
+
+**说明:**
+- 返回结果按时间戳升序排列
+- 用于在ECG波形图上显示所有标注点
+
+#### 3.3.6 查询用户标注历史
+
+```http
+GET /ecg/annotation/history?userId=1&page=1&size=20
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 10,
+      "userId": 1,
+      "analysisResultId": 5,
+      "timestampMs": 2000,
+      "annotationType": "ABNORMAL_POINT",
+      "label": "室性早搏",
+      "isAiGenerated": 0,
+      "createdBy": 1,
+      "createdAt": "2026-04-14T09:00:00"
+    }
+  ]
+}
+```
+
+**分页参数:**
+- `page`: 页码 (默认1)
+- `size`: 每页大小 (默认20)
+
+**说明:**
+- 返回结果按创建时间降序排列
+- 用于展示用户的标注历史记录
+
+#### 3.3.7 AI自动标注 ✨
+
+```http
+POST /ecg/annotation/ai-annotate/{analysisResultId}?userId=1
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 100,
+      "userId": 1,
+      "analysisResultId": 1,
+      "timestampMs": 80,
+      "annotationType": "P_WAVE",
+      "label": "P",
+      "confidence": 0.95,
+      "isAiGenerated": 1,
+      "createdBy": 1,
+      "createdAt": "2026-04-14T10:40:00"
+    },
+    {
+      "id": 101,
+      "userId": 1,
+      "analysisResultId": 1,
+      "timestampMs": 160,
+      "annotationType": "QRS_COMPLEX",
+      "label": "QRS",
+      "confidence": 0.98,
+      "isAiGenerated": 1,
+      "createdBy": 1,
+      "createdAt": "2026-04-14T10:40:00"
+    },
+    {
+      "id": 102,
+      "userId": 1,
+      "analysisResultId": 1,
+      "timestampMs": 320,
+      "annotationType": "T_WAVE",
+      "label": "T",
+      "confidence": 0.93,
+      "isAiGenerated": 1,
+      "createdBy": 1,
+      "createdAt": "2026-04-14T10:40:00"
+    }
+  ]
+}
+```
+
+**说明:**
+- AI算法自动识别ECG波形中的P/QRS/T波
+- 为每个心跳周期生成3个标注点
+- 标注置信度在0.90-0.99之间
+- 适用于快速预览和辅助诊断
+
+#### 3.3.8 查询用户标注统计
+
+```http
+GET /ecg/annotation/statistics?userId=1
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "totalCount": 150,
+    "typeStatistics": {
+      "P_WAVE": 50,
+      "QRS_COMPLEX": 50,
+      "T_WAVE": 40,
+      "ST_SEGMENT": 5,
+      "ABNORMAL_POINT": 3,
+      "OTHER": 2
+    },
+    "aiGeneratedCount": 120,
+    "manualCount": 30
+  }
+}
+```
+
+**说明:**
+- `totalCount`: 总标注数
+- `typeStatistics`: 按类型统计
+- `aiGeneratedCount`: AI生成的标注数
+- `manualCount`: 手动标注数
 
 ---
 
@@ -523,9 +852,16 @@ function connectWebSocket() {
 
 ## 6. 更新日志
 
-### v1.3.2 (2026-04-14)
+### v1.4.0 (2026-04-14)
 
-**新增功能:**
+- ✨ ECG标注管理功能
+- ✨ 8个REST API端点(创建/更新/删除/查询标注)
+- ✨ AI自动标注算法(P/QRS/T波识别)
+- ✨ 标注统计分析
+- ✨ 权限验证机制
+
+### v1.3.3 (2026-04-14)
+
 - ✨ WebSocket实时ECG数据推送
 - ✨ ECG数据模拟服务 (用于测试)
 - ✨ POST `/api/ecg/simulation/start` - 启动ECG模拟
@@ -551,6 +887,13 @@ function connectWebSocket() {
 - 📚 前端集成示例代码
 - 📚 性能优化建议
 
+### v1.3.2 (2026-04-14)
+
+- ✨ ECG前端页面集成
+- ✨ ECharts波形可视化
+- ✨ AI分析结果展示
+- ✨ 历史记录管理
+
 ### v1.3.1 (2026-04-13)
 
 - ✨ ECG前端页面集成
@@ -568,7 +911,7 @@ function connectWebSocket() {
 
 <div align="center">
 
-**文档版本**: v1.3.2  
+**文档版本**: v1.4.0  
 **最后更新**: 2026-04-14  
 **维护团队**: CardioGuard Development Team
 
