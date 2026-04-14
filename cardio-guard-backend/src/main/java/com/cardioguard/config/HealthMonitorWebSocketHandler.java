@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 健康监控WebSocket处理器
- * 用于实时推送心率等生理参数数据
+ * 用于实时推送心率、ECG等生理参数数据
  */
 @Slf4j
 public class HealthMonitorWebSocketHandler extends TextWebSocketHandler {
@@ -76,23 +76,45 @@ public class HealthMonitorWebSocketHandler extends TextWebSocketHandler {
     }
     
     /**
-     * 向指定用户推送实时数据
+     * 向指定用户推送实时心率数据
      * 
      * @param userId 用户ID
      * @param data 数据对象
      */
     public static void pushData(Long userId, Object data) {
+        pushRealtimeData(userId, "realtime-data", data);
+    }
+    
+    /**
+     * 向指定用户推送实时ECG数据
+     * 
+     * @param userId 用户ID
+     * @param ecgData ECG数据对象
+     */
+    public static void pushEcgData(Long userId, Object ecgData) {
+        pushRealtimeData(userId, "ecg-data", ecgData);
+    }
+    
+    /**
+     * 推送实时数据的通用方法
+     * 
+     * @param userId 用户ID
+     * @param dataType 数据类型 (realtime-data, ecg-data等)
+     * @param data 数据对象
+     */
+    private static void pushRealtimeData(Long userId, String dataType, Object data) {
         WebSocketSession session = SESSIONS.get(userId);
         if (session != null && session.isOpen()) {
             try {
                 Map<String, Object> message = Map.of(
-                    "type", "realtime-data",
+                    "type", dataType,
+                    "timestamp", System.currentTimeMillis(),
                     "data", data
                 );
                 sendMessage(session, message);
-                log.debug("数据推送成功: userId={}", userId);
+                log.debug("{}推送成功: userId={}", dataType, userId);
             } catch (IOException e) {
-                log.error("数据推送失败: userId={}", userId, e);
+                log.error("{}推送失败: userId={}", dataType, userId, e);
             }
         } else {
             log.warn("用户不在线或会话已关闭: userId={}", userId);

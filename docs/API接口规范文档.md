@@ -1,592 +1,452 @@
-# CardioGuard 360 API 接口规范文档
+# CardioGuard 360 API接口规范文档
 
-## 文档版本: v1.0.0
+## 📋 目录
 
----
-
-## 目录
-
-1. [认证接口](#1-认证接口)
-2. [用户管理接口](#2-用户管理接口)
-3. [设备管理接口](#3-设备管理接口)
-4. [心率数据接口](#4-心率数据接口)
-5. [健康预警接口](#5-健康预警接口)
-6. [WebSocket实时推送](#6-websocket实时推送)
+- [1. 概述](#1-概述)
+- [2. 认证与授权](#2-认证与授权)
+- [3. RESTful API](#3-restful-api)
+- [4. WebSocket实时通信](#4-websocket实时通信)
+- [5. 错误码说明](#5-错误码说明)
+- [6. 更新日志](#6-更新日志)
 
 ---
 
-## 基础信息
+## 1. 概述
 
-### API Base URL
-```
-http://localhost:8080/api
-```
+### 1.1 基础信息
 
-### 响应格式
-所有接口返回统一的JSON格式:
+- **Base URL**: `http://localhost:8080/api`
+- **协议**: HTTP/1.1, HTTPS (生产环境)
+- **数据格式**: JSON
+- **字符编码**: UTF-8
+- **API版本**: v1.3.2
+
+### 1.2 通用响应格式
+
+所有API响应遵循统一格式:
 
 ```json
 {
   "code": 200,
-  "message": "操作成功",
+  "message": "success",
   "data": {},
-  "timestamp": 1704067200000
+  "timestamp": 1712995200000
 }
 ```
 
-### 状态码说明
-
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 成功 |
-| 400 | 请求参数错误 |
-| 401 | 未授权 |
-| 403 | 禁止访问 |
-| 404 | 资源不存在 |
-| 500 | 服务器内部错误 |
-
-### 认证方式
-
-大部分接口需要在Header中携带JWT Token:
-
-```
-Authorization: Bearer {token}
-```
+**字段说明:**
+- `code`: 状态码 (200-成功, 其他-失败)
+- `message`: 响应消息
+- `data`: 响应数据 (对象或数组)
+- `timestamp`: 服务器时间戳
 
 ---
 
-## 1. 认证接口
+## 2. 认证与授权
 
-### 1.1 用户注册
+### 2.1 JWT Token认证
 
-**接口地址:** `POST /api/auth/register`
+**请求头:**
+```
+Authorization: Bearer <your_jwt_token>
+```
 
-**请求参数:**
-```json
+**获取Token:**
+```http
+POST /auth/login
+Content-Type: application/json
+
 {
   "username": "patient1",
-  "password": "123456",
-  "realName": "张三",
-  "phone": "13800138000",
-  "email": "patient1@example.com",
-  "gender": 1,
-  "age": 60,
-  "idCard": "110101196001011234",
-  "role": "PATIENT"
+  "password": "123456"
 }
 ```
 
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "注册成功",
-  "data": {
-    "id": 1,
-    "username": "patient1",
-    "realName": "张三",
-    "phone": "13800138000",
-    "role": "PATIENT",
-    "status": 1,
-    "createTime": "2024-01-01T10:00:00"
-  },
-  "timestamp": 1704067200000
-}
-```
-
-### 1.2 用户登录
-
-**接口地址:** `POST /api/auth/login`
-
-**请求参数:**
-```
-username=patient1&password=123456
-```
-
-**响应示例:**
+**响应:**
 ```json
 {
   "code": 200,
   "message": "登录成功",
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiJ9...",
-    "user": {
-      "id": 1,
-      "username": "patient1",
-      "realName": "张三",
-      "role": "PATIENT"
-    }
-  },
-  "timestamp": 1704067200000
-}
-```
-
-### 1.3 刷新Token
-
-**接口地址:** `POST /api/auth/refresh-token`
-
-**请求参数:**
-```
-token={旧token}
-```
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "刷新成功",
-  "data": "eyJhbGciOiJIUzI1NiJ9...",
-  "timestamp": 1704067200000
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "userId": 1,
+    "role": "PATIENT"
+  }
 }
 ```
 
 ---
 
-## 2. 用户管理接口
+## 3. RESTful API
 
-### 2.1 获取用户信息
+### 3.1 用户管理模块
 
-**接口地址:** `GET /api/auth/{id}`
+#### 3.1.1 用户注册
 
-**路径参数:**
-- `id`: 用户ID
+```http
+POST /user/register
+Content-Type: application/json
 
-**响应示例:**
+{
+  "username": "patient1",
+  "password": "123456",
+  "email": "patient1@example.com",
+  "phone": "13800138000",
+  "role": "PATIENT"
+}
+```
+
+#### 3.1.2 用户登录
+
+```http
+POST /user/login
+Content-Type: application/json
+
+{
+  "username": "patient1",
+  "password": "123456"
+}
+```
+
+### 3.2 ECG心电图分析模块
+
+#### 3.2.1 分析ECG数据
+
+```http
+POST /ecg/analyze?userId=1&deviceId=1
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "waveform": "[0.1, 0.2, -0.1, ...]",
+  "sampleRate": 250
+}
+```
+
+**响应:**
 ```json
 {
   "code": 200,
-  "message": "操作成功",
+  "message": "success",
   "data": {
     "id": 1,
-    "username": "patient1",
-    "realName": "张三",
-    "phone": "13800138000",
-    "email": "patient1@example.com",
-    "gender": 1,
-    "age": 60,
-    "role": "PATIENT",
-    "status": 1
-  },
-  "timestamp": 1704067200000
+    "userId": 1,
+    "deviceId": 1,
+    "diagnosis": "NORMAL",
+    "arrhythmiaType": null,
+    "confidence": 0.95,
+    "riskLevel": "LOW",
+    "prInterval": 160,
+    "qrsDuration": 90,
+    "qtInterval": 380,
+    "axis": 45,
+    "averageHeartRate": 72,
+    "reviewStatus": "PENDING",
+    "createdAt": "2026-04-13T10:30:00"
+  }
 }
 ```
 
-### 2.2 更新用户信息
+#### 3.2.2 批量分析ECG数据
 
-**接口地址:** `PUT /api/auth`
+```http
+POST /ecg/batch-analyze
+Content-Type: application/json
+Authorization: Bearer <token>
 
-**请求参数:**
-```json
-{
-  "id": 1,
-  "realName": "张三丰",
-  "phone": "13800138000",
-  "email": "newemail@example.com",
-  "age": 61
-}
-```
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "更新成功",
-  "data": null,
-  "timestamp": 1704067200000
-}
-```
-
-### 2.3 删除用户
-
-**接口地址:** `DELETE /api/auth/{id}`
-
-**路径参数:**
-- `id`: 用户ID
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "删除成功",
-  "data": null,
-  "timestamp": 1704067200000
-}
-```
-
-### 2.4 查询用户列表
-
-**接口地址:** `GET /api/auth/list`
-
-**请求参数:**
-- `pageNum`: 页码(默认1)
-- `pageSize`: 每页大小(默认10)
-- `role`: 角色筛选(可选)
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "records": [...],
-    "total": 100,
-    "pageNum": 1,
-    "pageSize": 10,
-    "totalPages": 10,
-    "hasPrevious": false,
-    "hasNext": true
-  },
-  "timestamp": 1704067200000
-}
-```
-
-### 2.5 绑定设备
-
-**接口地址:** `POST /api/auth/bind-device`
-
-**请求参数:**
-```
-userId=1&serialNumber=ECG20240001
-```
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "设备绑定成功",
-  "data": null,
-  "timestamp": 1704067200000
-}
-```
-
-### 2.6 解绑设备
-
-**接口地址:** `POST /api/auth/unbind-device`
-
-**请求参数:**
-```
-userId=1&deviceId=1
-```
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "设备解绑成功",
-  "data": null,
-  "timestamp": 1704067200000
-}
-```
-
----
-
-## 3. 设备管理接口
-
-### 3.1 获取设备列表
-
-**接口地址:** `GET /api/device/list`
-
-**请求参数:**
-- `userId`: 用户ID(可选)
-- `deviceType`: 设备类型(可选)
-- `status`: 设备状态(可选)
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": [
-    {
-      "id": 1,
-      "serialNumber": "ECG20240001",
-      "deviceName": "心电监测仪-001",
-      "model": "ECG-Pro-X1",
-      "deviceType": "ECG",
-      "manufacturer": "CardioTech",
-      "userId": 1,
-      "status": 1,
-      "batteryLevel": 85,
-      "firmwareVersion": "v1.2.3"
-    }
-  ],
-  "timestamp": 1704067200000
-}
-```
-
----
-
-## 4. 心率数据接口
-
-### 4.1 上报心率数据
-
-**接口地址:** `POST /api/health/heart-rate/report`
-
-**请求参数:**
-```json
-{
-  "userId": 1,
-  "deviceId": 1,
-  "heartRate": 75.5,
-  "rrInterval": 800.0,
-  "hrv": 50.0,
-  "activityStatus": "REST",
-  "dataQuality": 95
-}
-```
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "数据上报成功",
-  "data": null,
-  "timestamp": 1704067200000
-}
-```
-
-### 4.2 批量上报心率数据
-
-**接口地址:** `POST /api/health/heart-rate/batch-report`
-
-**请求参数:**
-```json
 [
   {
     "userId": 1,
     "deviceId": 1,
-    "heartRate": 75.5,
-    "measureTime": "2024-01-01T10:00:00"
+    "waveform": "[0.1, 0.2, ...]",
+    "sampleRate": 250
   },
   {
     "userId": 1,
     "deviceId": 1,
-    "heartRate": 76.2,
-    "measureTime": "2024-01-01T10:01:00"
+    "waveform": "[0.15, 0.25, ...]",
+    "sampleRate": 250
   }
 ]
 ```
 
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "批量上报成功,共2条",
-  "data": null,
-  "timestamp": 1704067200000
-}
+#### 3.2.3 获取用户ECG分析历史
+
+```http
+GET /ecg/history?userId=1&page=1&size=10
+Authorization: Bearer <token>
 ```
 
-### 4.3 查询心率数据
-
-**接口地址:** `GET /api/health/heart-rate/query`
-
-**请求参数:**
-- `userId`: 用户ID
-- `startTime`: 开始时间(ISO格式)
-- `endTime`: 结束时间(ISO格式)
-
-**响应示例:**
+**响应:**
 ```json
 {
   "code": 200,
-  "message": "操作成功",
-  "data": [
-    {
-      "userId": 1,
-      "deviceId": 1,
-      "measureTime": "2024-01-01T10:00:00",
-      "heartRate": 75.5,
-      "rrInterval": 800.0,
-      "hrv": 50.0,
-      "activityStatus": "REST",
-      "dataQuality": 95
-    }
-  ],
-  "timestamp": 1704067200000
-}
-```
-
-### 4.4 获取最新心率数据
-
-**接口地址:** `GET /api/health/heart-rate/latest`
-
-**请求参数:**
-- `userId`: 用户ID
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "userId": 1,
-    "deviceId": 1,
-    "measureTime": "2024-01-01T10:30:00",
-    "heartRate": 72.3,
-    "rrInterval": 830.0,
-    "hrv": 55.0,
-    "activityStatus": "REST",
-    "dataQuality": 98
-  },
-  "timestamp": 1704067200000
-}
-```
-
-### 4.5 获取平均心率
-
-**接口地址:** `GET /api/health/heart-rate/average`
-
-**请求参数:**
-- `userId`: 用户ID
-- `startTime`: 开始时间
-- `endTime`: 结束时间
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": 74.5,
-  "timestamp": 1704067200000
-}
-```
-
-### 4.6 检测异常心率
-
-**接口地址:** `GET /api/health/heart-rate/abnormal`
-
-**请求参数:**
-- `userId`: 用户ID
-- `startTime`: 开始时间
-- `endTime`: 结束时间
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": [
-    {
-      "userId": 1,
-      "deviceId": 1,
-      "measureTime": "2024-01-01T10:15:00",
-      "heartRate": 105.2,
-      "isAbnormal": 1,
-      "abnormalType": "TACHYCARDIA"
-    }
-  ],
-  "timestamp": 1704067200000
-}
-```
-
----
-
-## 5. 健康预警接口
-
-### 5.1 查询预警列表
-
-**接口地址:** `GET /api/alert/list`
-
-**请求参数:**
-- `userId`: 用户ID
-- `status`: 状态筛选(可选)
-- `alertLevel`: 预警级别筛选(可选)
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
+  "message": "success",
   "data": [
     {
       "id": 1,
-      "userId": 1,
-      "deviceId": 1,
-      "alertType": "TACHYCARDIA",
-      "alertLevel": "HIGH",
-      "title": "检测到心动过速",
-      "description": "心率超过正常范围上限",
-      "triggerValue": 105.2,
-      "normalRangeMin": 60.0,
-      "normalRangeMax": 100.0,
-      "status": "UNREAD",
-      "createTime": "2024-01-01T10:15:00"
+      "diagnosis": "NORMAL",
+      "confidence": 0.95,
+      "riskLevel": "LOW",
+      "reviewStatus": "PENDING",
+      "createdAt": "2026-04-13T10:30:00"
     }
-  ],
-  "timestamp": 1704067200000
+  ]
 }
 ```
 
-### 5.2 处理预警
+#### 3.2.4 获取分析结果详情
 
-**接口地址:** `PUT /api/alert/process`
-
-**请求参数:**
-```json
-{
-  "id": 1,
-  "doctorId": 2,
-  "doctorAdvice": "建议患者休息,持续观察。如症状加重请及时就医。"
-}
+```http
+GET /ecg/result/{resultId}
+Authorization: Bearer <token>
 ```
 
-**响应示例:**
+#### 3.2.5 医生审核分析结果
+
+```http
+PUT /ecg/review/{resultId}?doctorId=2&reviewStatus=APPROVED&comment=结果正常
+Authorization: Bearer <token>
+```
+
+#### 3.2.6 生成ECG诊断报告
+
+```http
+GET /ecg/report/{resultId}
+Authorization: Bearer <token>
+```
+
+**响应:**
 ```json
 {
   "code": 200,
-  "message": "处理成功",
-  "data": null,
-  "timestamp": 1704067200000
+  "message": "success",
+  "data": "# ECG诊断报告\n\n## 基本信息\n..."
+}
+```
+
+#### 3.2.7 统计用户ECG异常情况
+
+```http
+GET /ecg/statistics/abnormal?userId=1&startDate=2026-04-01&endDate=2026-04-13
+Authorization: Bearer <token>
+```
+
+#### 3.2.8 启动ECG数据模拟 ✨ NEW
+
+```http
+POST /ecg/simulation/start?userId=1
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "ECG数据模拟已启动"
+}
+```
+
+**说明:**
+- 启动后端ECG数据模拟器
+- 模拟器将每100ms通过WebSocket推送一个ECG数据点
+- 用于前端开发和测试
+
+#### 3.2.9 停止ECG数据模拟 ✨ NEW
+
+```http
+POST /ecg/simulation/stop?userId=1
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "ECG数据模拟已停止"
 }
 ```
 
 ---
 
-## 6. WebSocket实时推送
+## 4. WebSocket实时通信
 
-### 6.1 建立连接
+### 4.1 连接建立
 
-**WebSocket地址:**
+**WebSocket URL:**
 ```
-ws://localhost:8080/api/ws/health-monitor?userId=1
+ws://localhost:8080/ws/monitor?userId={userId}
 ```
 
-### 6.2 消息格式
+**参数说明:**
+- `userId`: 用户ID (必需)
 
-**服务端推送 - 实时数据:**
+**连接示例 (JavaScript):**
+```javascript
+const userId = 1;
+const ws = new WebSocket(`ws://localhost:8080/ws/monitor?userId=${userId}`);
+
+ws.onopen = () => {
+  console.log('WebSocket连接成功');
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  handleMessage(message);
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket错误:', error);
+};
+
+ws.onclose = (event) => {
+  console.log('WebSocket连接关闭:', event.code, event.reason);
+};
+```
+
+### 4.2 消息格式
+
+所有WebSocket消息采用JSON格式:
+
+```json
+{
+  "type": "message_type",
+  "timestamp": 1712995200000,
+  "data": {}
+}
+```
+
+**消息类型:**
+
+| 类型 | 方向 | 说明 |
+|------|------|------|
+| `connected` | 服务端→客户端 | 连接成功确认 |
+| `ack` | 服务端→客户端 | 消息接收确认 |
+| `realtime-data` | 服务端→客户端 | 实时心率等生理参数 |
+| `ecg-data` | 服务端→客户端 | 实时ECG波形数据 |
+
+### 4.3 消息类型详解
+
+#### 4.3.1 连接成功 (connected)
+
+**方向:** 服务端 → 客户端
+
+**触发时机:** WebSocket连接成功建立后
+
+**消息示例:**
+```json
+{
+  "type": "connected",
+  "message": "已成功连接到健康监测服务",
+  "userId": 1
+}
+```
+
+#### 4.3.2 实时心率数据 (realtime-data)
+
+**方向:** 服务端 → 客户端
+
+**触发时机:** 有心率数据更新时
+
+**消息示例:**
 ```json
 {
   "type": "realtime-data",
+  "timestamp": 1712995200000,
   "data": {
-    "heartRate": 75.5,
-    "measureTime": "2024-01-01T10:30:00",
-    ...
+    "heartRate": 72,
+    "spo2": 98,
+    "bloodPressure": {
+      "systolic": 120,
+      "diastolic": 80
+    }
   }
 }
 ```
 
-**服务端推送 - 预警消息:**
+**字段说明:**
+- `heartRate`: 心率 (bpm)
+- `spo2`: 血氧饱和度 (%)
+- `bloodPressure`: 血压 (mmHg)
+
+#### 4.3.3 实时ECG数据 (ecg-data) ✨ NEW
+
+**方向:** 服务端 → 客户端
+
+**触发时机:** 有ECG采样点时 (模拟频率: 10Hz, 实际应为250Hz)
+
+**消息示例:**
 ```json
 {
-  "type": "ALERT",
-  "message": "检测到异常心率: 105.2次/分钟",
+  "type": "ecg-data",
+  "timestamp": 1712995200100,
   "data": {
-    "alertType": "TACHYCARDIA",
-    "alertLevel": "HIGH",
-    ...
+    "timestamp": 1712995200100,
+    "voltage": 0.523,
+    "heartRate": 72.5,
+    "sampleRate": 250
   }
 }
 ```
 
-**客户端心跳:**
-```json
-{
-  "type": "ping"
+**字段说明:**
+- `timestamp`: 采样时间戳 (毫秒)
+- `voltage`: ECG电压值 (mV), 范围通常为 -2mV 到 +2mV
+- `heartRate`: 瞬时心率 (bpm)
+- `sampleRate`: 采样率 (Hz)
+
+**前端处理示例:**
+```javascript
+function handleEcgData(data) {
+  // 添加电压值到波形数组
+  ecgWaveform.push(data.voltage);
+  
+  // 保持最近500个数据点
+  if (ecgWaveform.length > 500) {
+    ecgWaveform.shift();
+  }
+  
+  // 更新心率显示
+  currentHeartRate.value = Math.round(data.heartRate);
+  
+  // 刷新ECharts图表
+  updateChart();
 }
 ```
 
-**服务端响应:**
+#### 4.3.4 广播消息 (broadcast)
+
+**方向:** 服务端 → 所有客户端
+
+**触发时机:** 系统公告、紧急预警等
+
+**消息示例:**
+```json
+{
+  "type": "broadcast",
+  "data": {
+    "title": "系统维护通知",
+    "content": "系统将于今晚23:00进行维护",
+    "level": "INFO"
+  }
+}
+```
+
+### 4.4 客户端发送消息
+
+客户端可以发送心跳包或其他控制指令:
+
+```javascript
+// 发送心跳
+ws.send(JSON.stringify({
+  type: 'heartbeat',
+  timestamp: Date.now()
+}));
+```
+
+服务端会回复确认消息:
 ```json
 {
   "type": "ack",
@@ -594,976 +454,122 @@ ws://localhost:8080/api/ws/health-monitor?userId=1
 }
 ```
 
----
+### 4.5 断线重连机制
 
-## 错误码说明
+**推荐实现:**
 
-| 错误码 | 说明 |
-|--------|------|
-| 400001 | 参数验证失败 |
-| 401001 | Token无效或过期 |
-| 403001 | 权限不足 |
-| 404001 | 资源不存在 |
-| 500001 | 数据库操作失败 |
-| 500002 | 外部服务调用失败 |
+```javascript
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
 
----
-
-## 速率限制
-
-- 普通接口: 100次/分钟
-- 数据上报接口: 60次/分钟
-- 登录接口: 10次/分钟
-
----
-
-## 7. 前端集成指南
-
-### 7.1 Vue 3 项目结构
-
-```
-cardio-guard-frontend/
-├── src/
-│   ├── stores/           # Pinia 状态管理
-│   │   ├── user.ts       # 用户认证 Store
-│   │   └── monitor.ts    # 监测数据 Store
-│   ├── views/            # 页面组件
-│   │   ├── Login.vue     # 登录页
-│   │   ├── Dashboard.vue # 数据看板
-│   │   └── Monitor.vue   # 实时监测
-│   └── router/           # 路由配置
-```
-
-### 7.2 用户认证集成
-
-**登录流程:**
-
-```typescript
-// stores/user.ts
-import { defineStore } from 'pinia'
-import axios from 'axios'
-
-export const useUserStore = defineStore('user', () => {
-  const token = ref<string>('')
-  const userInfo = ref<UserInfo | null>(null)
-
-  async function login(username: string, password: string) {
-    // 调用后端登录接口
-    const response = await axios.post(
-      `/api/auth/login?username=${username}&password=${password}`
-    )
-    
-    // 保存 Token
-    token.value = response.data.data.token
-    localStorage.setItem('token', token.value)
-    
-    // 获取用户信息
-    userInfo.value = response.data.data.user
-  }
-
-  async function fetchUserInfo() {
-    const response = await axios.get('/api/auth/info', {
-      headers: { Authorization: `Bearer ${token.value}` }
-    })
-    userInfo.value = response.data.data
-  }
-
-  function logout() {
-    token.value = ''
-    userInfo.value = null
-    localStorage.removeItem('token')
-  }
-
-  return { token, userInfo, login, logout, fetchUserInfo }
-})
-```
-
-**路由守卫:**
-
-```typescript
-// router/index.ts
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
+function connectWebSocket() {
+  ws = new WebSocket(wsUrl);
   
-  if (to.meta.requiresAuth && !token) {
-    next('/login')
-  } else if (to.path === '/login' && token) {
-    next('/')
-  } else {
-    next()
-  }
-})
-```
-
-### 7.3 WebSocket 实时通信
-
-**连接管理:**
-
-```typescript
-// stores/monitor.ts
-export const useMonitorStore = defineStore('monitor', () => {
-  const heartRateData = ref<HeartRateData[]>([])
-  const latestData = ref<HeartRateData | null>(null)
-  const wsConnected = ref(false)
-  let ws: WebSocket | null = null
-
-  function connectWebSocket(userId: number) {
-    const token = localStorage.getItem('token')
-    // 注意：根据实际后端实现，可能需要将 token 放在 header 或 query param 中
-    const wsUrl = `ws://localhost:8080/api/ws/health-monitor?userId=${userId}`
-    
-    ws = new WebSocket(wsUrl)
-    
-    ws.onopen = () => {
-      console.log('WebSocket 连接成功')
-      wsConnected.value = true
-      // 可选：发送鉴权消息
-      // ws.send(JSON.stringify({ type: 'auth', token: token }))
-    }
-    
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      handleRealtimeData(data)
-    }
-    
-    ws.onerror = (error) => {
-      console.error('WebSocket 错误:', error)
-      wsConnected.value = false
-    }
-    
-    ws.onclose = () => {
-      console.log('WebSocket 连接关闭')
-      wsConnected.value = false
-      // 5秒后自动重连
-      setTimeout(() => connectWebSocket(userId), 5000)
-    }
-  }
-
-  function handleRealtimeData(data: any) {
-    if (data.type === 'realtime-data') {
-      heartRateData.value.push(data.data)
-      latestData.value = data.data
+  ws.onclose = (event) => {
+    if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+      reconnectAttempts++;
+      const delay = 3000 * reconnectAttempts; // 指数退避
       
-      // 保持最近100条数据
-      if (heartRateData.value.length > 100) {
-        heartRateData.value.shift()
-      }
-    } else if (data.type === 'ALERT') {
-      // 处理预警消息
-      console.warn('收到预警:', data.message)
+      setTimeout(() => {
+        connectWebSocket();
+      }, delay);
     }
-  }
-
-  function disconnectWebSocket() {
-    if (ws) {
-      ws.close()
-      ws = null
-    }
-  }
-
-  return {
-    heartRateData,
-    latestData,
-    wsConnected,
-    connectWebSocket,
-    disconnectWebSocket
-  }
-})
-```
-
-**组件中使用:**
-
-``vue
-<!-- views/Monitor.vue -->
-<script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
-import { useMonitorStore } from '@/stores/monitor'
-import { useUserStore } from '@/stores/user'
-
-const monitorStore = useMonitorStore()
-const userStore = useUserStore()
-
-onMounted(() => {
-  if (userStore.userInfo?.id) {
-    monitorStore.connectWebSocket(userStore.userInfo.id)
-  }
-})
-
-onUnmounted(() => {
-  monitorStore.disconnectWebSocket()
-})
-</script>
-
-<template>
-  <div class="monitor">
-    <div class="heart-rate">
-      {{ monitorStore.latestData?.heartRate || '--' }} bpm
-    </div>
-  </div>
-</template>
-```
-
-### 7.4 ECharts 数据可视化
-
-**心率趋势图:**
-
-``vue
-<!-- views/Dashboard.vue -->
-<script setup lang="ts">
-import VChart from 'vue-echarts'
-import { use } from 'echarts/core'
-import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent } from 'echarts/components'
-import { useMonitorStore } from '@/stores/monitor'
-import { computed } from 'vue'
-
-// 按需引入 ECharts 组件
-use([CanvasRenderer, LineChart, GridComponent, TooltipComponent])
-
-const monitorStore = useMonitorStore()
-
-const chartOption = computed(() => ({
-  tooltip: {
-    trigger: 'axis',
-    formatter: '{b}<br/>心率: {c} bpm'
-  },
-  grid: {
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
-    containLabel: true
-  },
-  xAxis: {
-    type: 'category',
-    boundaryGap: false,
-    data: monitorStore.heartRateData.map(d => 
-      new Date(d.measureTime).toLocaleTimeString()
-    )
-  },
-  yAxis: {
-    type: 'value',
-    name: '心率 (bpm)',
-    min: 40,
-    max: 180
-  },
-  series: [{
-    name: '心率',
-    type: 'line',
-    smooth: true,
-    data: monitorStore.heartRateData.map(d => d.heartRate),
-    itemStyle: { color: '#409eff' },
-    areaStyle: {
-      color: {
-        type: 'linear',
-        x: 0, y: 0, x2: 0, y2: 1,
-        colorStops: [
-          { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
-          { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
-        ]
-      }
-    }
-  }]
-}))
-</script>
-
-<template>
-  <v-chart :option="chartOption" autoresize style="height: 350px" />
-</template>
-```
-
-### 7.5 Axios 拦截器配置
-
-**请求拦截器 - 自动添加 Token:**
-
-``typescript
-// utils/request.ts
-import axios from 'axios'
-import { ElMessage } from 'element-plus'
-
-const service = axios.create({
-  baseURL: '/api',
-  timeout: 10000
-})
-
-// 请求拦截器
-service.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  error => {
-    return Promise.reject(error)
-  }
-)
-
-// 响应拦截器
-service.interceptors.response.use(
-  response => {
-    const res = response.data
-    if (res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
-      return Promise.reject(new Error(res.message))
-    }
-    return res
-  },
-  error => {
-    if (error.response?.status === 401) {
-      ElMessage.error('未授权,请重新登录')
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
-
-export default service
-```
-
-### 7.6 历史数据查询
-
-**查询接口封装:**
-
-``typescript
-// api/health.ts
-import request from '@/utils/request'
-
-export function queryHeartRateData(params: {
-  userId: number
-  startTime: string
-  endTime: string
-}) {
-  return request.get('/health/heart-rate/query', { params })
-}
-
-export function getAverageHeartRate(params: {
-  userId: number
-  startTime: string
-  endTime: string
-}) {
-  return request.get('/health/heart-rate/average', { params })
-}
-```
-
-**组件中调用:**
-
-``vue
-<script setup lang="ts">
-import { queryHeartRateData } from '@/api/health'
-
-const loadHistoryData = async () => {
-  try {
-    const data = await queryHeartRateData({
-      userId: 1,
-      startTime: '2024-01-15T00:00:00',
-      endTime: '2024-01-15T23:59:59'
-    })
-    console.log('历史数据:', data)
-  } catch (error) {
-    console.error('查询失败:', error)
-  }
-}
-</script>
-```
-
-### 7.7 设备管理集成
-
-**设备列表查询:**
-
-``typescript
-// api/device.ts
-import request from '@/utils/request'
-
-export function getUserDevices(userId: number) {
-  return request.get(`/device/list?userId=${userId}`)
-}
-
-export function bindDevice(data: {
-  userId: number
-  serialNumber: string
-}) {
-  return request.post('/auth/bind-device', null, { params: data })
-}
-
-export function unbindDevice(userId: number, deviceId: number) {
-  return request.post('/auth/unbind-device', null, { params: { userId, deviceId } })
-}
-```
-
-### 7.8 预警信息处理
-
-**预警列表查询:**
-
-``typescript
-// api/alert.ts
-import request from '@/utils/request'
-
-export function getAlerts(params: {
-  userId?: number
-  status?: string
-  alertLevel?: string
-}) {
-  return request.get('/alert/list', { params })
-}
-
-export function processAlert(data: {
-  id: number
-  doctorId: number
-  doctorAdvice: string
-}) {
-  return request.put('/alert/process', data)
-}
-```
-
-### 7.9 前端性能优化
-
-**代码分割:**
-
-``typescript
-// router/index.ts - 路由懒加载
-{
-  path: '/dashboard',
-  component: () => import('@/views/Dashboard.vue')
-}
-```
-
-**ECharts 按需引入:**
-
-``typescript
-// 只引入需要的图表类型,减少打包体积
-import { LineChart, PieChart } from 'echarts/charts'
-use([LineChart, PieChart])
-```
-
-**防抖处理:**
-
-``typescript
-import { debounce } from 'lodash-es'
-
-const updateChart = debounce(() => {
-  // 更新图表
-}, 300)
-```
-
-### 7.10 错误处理最佳实践
-
-**全局错误处理:**
-
-``typescript
-// main.ts
-app.config.errorHandler = (err, vm, info) => {
-  console.error('Vue Error:', err, info)
-  // 上报错误到监控系统
-}
-```
-
-**异步错误处理:**
-
-``typescript
-try {
-  await userStore.login(username, password)
-  ElMessage.success('登录成功')
-} catch (error: any) {
-  ElMessage.error(error.response?.data?.message || '登录失败')
-}
-```
-
----
-
-## 8. 测试指南
-
-### 8.1 API 测试
-
-**使用 Postman 或 curl 测试:**
-
-```bash
-# 登录测试
-curl -X POST "http://localhost:8080/api/auth/login?username=patient1&password=123456"
-
-# 查询心率数据
-curl -X GET "http://localhost:8080/api/health/heart-rate/query?userId=1&startTime=2024-01-01T00:00:00&endTime=2024-01-01T23:59:59" \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-### 8.2 WebSocket 测试
-
-**使用 wscat 测试:**
-
-```bash
-# 安装 wscat
-npm install -g wscat
-
-# 连接 WebSocket
-wscat -c "ws://localhost:8080/api/ws/health-monitor?userId=1"
-```
-
----
-
-## 9. ECG心电图分析接口 (v1.3.0)
-
-### 9.1 分析ECG数据
-
-**接口地址:** `POST /api/ecg/analyze`
-
-**请求参数:**
-- Query Parameters:
-  - `userId` (Long, 必填) - 用户ID
-  - `deviceId` (Long, 必填) - 设备ID
-- Request Body (JSON):
-  ```json
-  {
-    "waveform": "base64_encoded_waveform_data",
-    "sampleRate": 250
-  }
-  ```
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "id": 1,
-    "userId": 1,
-    "deviceId": 1,
-    "diagnosis": "NORMAL",
-    "arrhythmiaType": null,
-    "confidence": 0.95,
-    "modelVersion": "ECG-AI-v1.0.0",
-    "riskLevel": "LOW",
-    "recommendation": "心电图正常,请继续保持健康生活方式。",
-    "needsReview": 0,
-    "reviewStatus": "PENDING",
-    "createdAt": "2026-04-13T10:30:00"
-  },
-  "timestamp": 1713000000000
-}
-```
-
-**前端集成示例:**
-```typescript
-// api/ecg.ts
-import request from '@/utils/request'
-
-export function analyzeEcg(userId: number, deviceId: number, data: {
-  waveform: string
-  sampleRate: number
-}) {
-  return request.post(`/api/ecg/analyze?userId=${userId}&deviceId=${deviceId}`, data)
-}
-
-// 组件中使用
-const handleAnalyze = async () => {
-  try {
-    const result = await analyzeEcg(1, 1, {
-      waveform: ecgWaveformData,
-      sampleRate: 250
-    })
-    console.log('诊断结果:', result.data.diagnosis)
-  } catch (error) {
-    console.error('分析失败:', error)
-  }
-}
-```
-
-### 9.2 批量分析ECG数据
-
-**接口地址:** `POST /api/ecg/batch-analyze`
-
-**请求参数:**
-- Request Body (JSON Array):
-  ```json
-  [
-    {
-      "userId": 1,
-      "deviceId": 1,
-      "waveform": "waveform_data_1",
-      "sampleRate": 250
-    },
-    {
-      "userId": 2,
-      "deviceId": 2,
-      "waveform": "waveform_data_2",
-      "sampleRate": 500
-    }
-  ]
-  ```
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": [
-    { "id": 1, "diagnosis": "NORMAL", ... },
-    { "id": 2, "diagnosis": "ABNORMAL", ... }
-  ],
-  "timestamp": 1713000000000
-}
-```
-
-### 9.3 获取用户ECG分析历史
-
-**接口地址:** `GET /api/ecg/history`
-
-**请求参数:**
-- Query Parameters:
-  - `userId` (Long, 必填) - 用户ID
-  - `page` (Integer, 可选, 默认1) - 页码
-  - `size` (Integer, 可选, 默认10) - 每页大小
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": [
-    {
-      "id": 5,
-      "userId": 1,
-      "diagnosis": "NORMAL",
-      "confidence": 0.97,
-      "riskLevel": "LOW",
-      "createdAt": "2026-04-13T09:00:00"
-    },
-    {
-      "id": 4,
-      "userId": 1,
-      "diagnosis": "NORMAL",
-      "confidence": 0.95,
-      "riskLevel": "LOW",
-      "createdAt": "2026-04-12T15:30:00"
-    }
-  ],
-  "timestamp": 1713000000000
-}
-```
-
-**前端集成示例:**
-``vue
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { getEcgHistory } from '@/api/ecg'
-
-const historyList = ref([])
-
-const loadHistory = async () => {
-  const res = await getEcgHistory(1, 1, 10)
-  historyList.value = res.data
-}
-
-onMounted(() => {
-  loadHistory()
-})
-</script>
-
-<template>
-  <el-table :data="historyList">
-    <el-table-column prop="diagnosis" label="诊断结果" />
-    <el-table-column prop="confidence" label="置信度">
-      <template #default="{ row }">
-        {{ (row.confidence * 100).toFixed(2) }}%
-      </template>
-    </el-table-column>
-    <el-table-column prop="riskLevel" label="风险等级">
-      <template #default="{ row }">
-        <el-tag :type="getRiskType(row.riskLevel)">
-          {{ row.riskLevel }}
-        </el-tag>
-      </template>
-    </el-table-column>
-  </el-table>
-</template>
-```
-
-### 9.4 获取分析结果详情
-
-**接口地址:** `GET /api/ecg/result/{resultId}`
-
-**请求参数:**
-- Path Parameters:
-  - `resultId` (Long, 必填) - 分析结果ID
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "id": 1,
-    "userId": 1,
-    "deviceId": 1,
-    "ecgDataId": "ecg-test-001",
-    "diagnosis": "NORMAL",
-    "arrhythmiaType": null,
-    "confidence": 0.95,
-    "modelVersion": "ECG-AI-v1.0.0",
-    "analysisReport": "{\"diagnosis\":\"NORMAL\",\"confidence\":0.95,\"riskLevel\":\"LOW\"}",
-    "riskLevel": "LOW",
-    "recommendation": "心电图正常,请继续保持健康生活方式。",
-    "needsReview": 0,
-    "reviewStatus": "APPROVED",
-    "reviewedBy": 100,
-    "reviewedAt": "2026-04-13T11:00:00",
-    "reviewComment": "确认正常",
-    "createdAt": "2026-04-13T10:30:00",
-    "updatedAt": "2026-04-13T11:00:00"
-  },
-  "timestamp": 1713000000000
-}
-```
-
-### 9.5 医生审核分析结果
-
-**接口地址:** `PUT /api/ecg/review/{resultId}`
-
-**请求参数:**
-- Path Parameters:
-  - `resultId` (Long, 必填) - 分析结果ID
-- Query Parameters:
-  - `doctorId` (Long, 必填) - 医生ID
-  - `reviewStatus` (String, 必填) - 审核状态 (APPROVED/REJECTED)
-  - `comment` (String, 可选) - 审核意见
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "id": 2,
-    "reviewStatus": "APPROVED",
-    "reviewedBy": 100,
-    "reviewedAt": "2026-04-13T14:30:00",
-    "reviewComment": "建议定期复查"
-  },
-  "timestamp": 1713000000000
-}
-```
-
-**前端集成示例:**
-``vue
-<script setup lang="ts">
-import { reviewEcgResult } from '@/api/ecg'
-
-const handleReview = async (resultId: number, status: string, comment: string) => {
-  try {
-    await reviewEcgResult(resultId, doctorId.value, status, comment)
-    ElMessage.success('审核成功')
-    loadPendingReviews() // 刷新待审核列表
-  } catch (error) {
-    ElMessage.error('审核失败')
-  }
-}
-</script>
-
-<template>
-  <el-dialog title="审核ECG结果" v-model="dialogVisible">
-    <el-radio-group v-model="reviewStatus">
-      <el-radio label="APPROVED">通过</el-radio>
-      <el-radio label="REJECTED">拒绝</el-radio>
-    </el-radio-group>
-    <el-input 
-      v-model="reviewComment" 
-      type="textarea" 
-      placeholder="请输入审核意见"
-    />
-    <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="handleReview(currentResultId, reviewStatus, reviewComment)">
-        提交
-      </el-button>
-    </template>
-  </el-dialog>
-</template>
-```
-
-### 9.6 生成ECG诊断报告
-
-**接口地址:** `GET /api/ecg/report/{resultId}`
-
-**请求参数:**
-- Path Parameters:
-  - `resultId` (Long, 必填) - 分析结果ID
-
-**响应示例:**
-```
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": "# ECG心电图诊断报告\n\n**报告ID**: 1\n**生成时间**: 2026-04-13T10:30:00\n\n## 基本信息\n- **用户ID**: 1\n- **设备ID**: 1\n- **AI模型版本**: ECG-AI-v1.0.0\n\n## 诊断结果\n- **诊断**: NORMAL\n- **AI置信度**: 95.00%\n- **风险等级**: LOW\n\n## 建议措施\n心电图正常,请继续保持健康生活方式。\n\n## 医生审核\n- **审核状态**: APPROVED\n- **审核医生**: 100\n- **审核时间**: 2026-04-13T11:00:00\n- **审核意见**: 确认正常",
-  "timestamp": 1713000000000
-}
-```
-
-**前端集成示例:**
-``vue
-<script setup lang="ts">
-import { getEcgReport } from '@/api/ecg'
-import MarkdownIt from 'markdown-it'
-
-const md = new MarkdownIt()
-const reportContent = ref('')
-
-const loadReport = async (resultId: number) => {
-  const res = await getEcgReport(resultId)
-  reportContent.value = md.render(res.data)
-}
-</script>
-
-<template>
-  <div class="report-container" v-html="reportContent"></div>
-</template>
-
-<style scoped>
-.report-container {
-  padding: 20px;
-  background: #fff;
-  border-radius: 8px;
-}
-</style>
-```
-
-### 9.7 统计用户ECG异常情况
-
-**接口地址:** `GET /api/ecg/statistics/abnormal`
-
-**请求参数:**
-- Query Parameters:
-  - `userId` (Long, 必填) - 用户ID
-  - `startDate` (String, 可选) - 开始日期 (ISO 8601格式)
-  - `endDate` (String, 可选) - 结束日期 (ISO 8601格式)
-
-**响应示例:**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "totalAbnormal": 5,
-    "arrhythmiaTypes": {
-      "AFIB": 2,
-      "PVC": 2,
-      "ST_ELEVATION": 1
-    },
-    "riskDistribution": {
-      "HIGH": 2,
-      "MEDIUM": 2,
-      "CRITICAL": 1
-    }
-  },
-  "timestamp": 1713000000000
-}
-```
-
-**前端集成示例 (ECharts 可视化):**
-``vue
-<script setup lang="ts">
-import VChart from 'vue-echarts'
-import { use } from 'echarts/core'
-import { PieChart } from 'echarts/charts'
-import { getEcgAbnormalStats } from '@/api/ecg'
-
-use([PieChart])
-
-const stats = ref(null)
-
-const loadStats = async () => {
-  const res = await getEcgAbnormalStats(userId.value, startDate, endDate)
-  stats.value = res.data
+  };
   
-  // 更新图表
-  updateChart()
+  ws.onopen = () => {
+    reconnectAttempts = 0; // 重置重连计数
+  };
 }
-
-const chartOption = computed(() => ({
-  title: { text: '心律失常类型分布', left: 'center' },
-  tooltip: { trigger: 'item' },
-  series: [{
-    type: 'pie',
-    radius: '50%',
-    data: Object.entries(stats.value?.arrhythmiaTypes || {}).map(([name, value]) => ({
-      name,
-      value
-    })),
-    emphasis: {
-      itemStyle: {
-        shadowBlur: 10,
-        shadowOffsetX: 0,
-        shadowColor: 'rgba(0, 0, 0, 0.5)'
-      }
-    }
-  }]
-}))
-</script>
-
-<template>
-  <div class="stats-container">
-    <div class="stat-card">
-      <h3>异常总数</h3>
-      <p class="stat-value">{{ stats?.totalAbnormal || 0 }}</p>
-    </div>
-    <v-chart :option="chartOption" style="height: 300px" />
-  </div>
-</template>
 ```
 
+**重连策略:**
+- 最大重试次数: 5次
+- 重试间隔: 指数退避 (3s, 6s, 9s, 12s, 15s)
+- 正常关闭 (code=1000) 不重连
+
+### 4.6 性能优化建议
+
+1. **数据采样率控制**
+   - ECG数据: 建议250Hz (每4ms一个点)
+   - 演示环境可降低至10Hz (每100ms一个点)
+   
+2. **前端缓冲策略**
+   - 保持最近500个数据点
+   - 使用环形缓冲区避免内存泄漏
+   
+3. **图表渲染优化**
+   - 使用ECharts的`showSymbol: false`
+   - 启用`throttle`节流渲染
+   - 使用`dataZoom`支持大数据量查看
+
+4. **网络带宽优化**
+   - 压缩波形数据 (可选)
+   - 批量发送 (非实时场景)
+
 ---
 
-## 10. 常见问题
+## 5. 错误码说明
 
-### Q1: Token 过期如何处理?
-
-**A:** 在响应拦截器中捕获 401 错误,清除本地 Token 并跳转到登录页。
-
-### Q2: WebSocket 断线如何重连?
-
-**A:** 在 `onclose` 事件中使用 `setTimeout` 延迟5秒后重新调用 `connectWebSocket()`。
-
-### Q3: ECharts 图表不显示?
-
-**A:** 确保已正确注册所需的组件和图表类型,检查容器是否有明确的高度。
-
-### Q4: 跨域问题如何解决?
-
-**A:** 开发环境使用 Vite 代理,生产环境配置 Nginx 反向代理。
+| 错误码 | 说明 | 解决方案 |
+|--------|------|----------|
+| 200 | 成功 | - |
+| 400 | 请求参数错误 | 检查请求参数格式和必填项 |
+| 401 | 未授权 | 检查JWT Token是否有效 |
+| 403 | 禁止访问 | 检查用户权限 |
+| 404 | 资源不存在 | 检查URL路径 |
+| 500 | 服务器内部错误 | 联系技术支持 |
 
 ---
 
-## 更新日志
+## 6. 更新日志
+
+### v1.3.2 (2026-04-14)
+
+**新增功能:**
+- ✨ WebSocket实时ECG数据推送
+- ✨ ECG数据模拟服务 (用于测试)
+- ✨ POST `/api/ecg/simulation/start` - 启动ECG模拟
+- ✨ POST `/api/ecg/simulation/stop` - 停止ECG模拟
+- ✨ WebSocket消息类型 `ecg-data`
+- ✨ 前端自动重连机制
+
+**技术改进:**
+- 🔧 HealthMonitorWebSocketHandler扩展支持多数据类型
+- 🔧 通用推送方法 `pushRealtimeData()`
+- 🔧 ECG波形模拟算法 (P-QRS-T复合波)
+- 🔧 指数退避重连策略
+
+**前端集成:**
+- 🎨 EcgMonitor.vue WebSocket连接管理
+- 🎨 实时ECG数据接收和处理
+- 🎨 断线自动重连 (最多5次)
+- 🎨 连接状态可视化
+
+**文档更新:**
+- 📚 WebSocket协议完整说明
+- 📚 消息格式和类型详解
+- 📚 前端集成示例代码
+- 📚 性能优化建议
 
 ### v1.3.1 (2026-04-13)
-- 新增ECG前端集成模块
-- 添加ECG监测页面路由和导航菜单
-- 完善ECG API TypeScript封装 (7个方法)
-- 补充ECharts波形可视化配置说明
-- 添加诊断报告查看和下载功能示例
-- 提供完整的组件测试用例清单
+
+- ✨ ECG前端页面集成
+- ✨ ECharts波形可视化
+- ✨ AI分析结果展示
+- ✨ 历史记录管理
 
 ### v1.3.0 (2026-04-13)
-- 新增ECG心电图分析模块
-- 添加7个ECG分析REST API接口
-- 完善医生审核流程接口规范
-- 补充诊断报告生成接口
-- 添加异常统计接口及ECharts可视化示例
-- 提供完整的前端集成代码示例
 
-### v1.2.0 (2026-04-12)
-- 新增前端 Vue 3 项目
-- 完善 WebSocket 实时通信规范
-- 添加前端集成示例代码
-- 补充 ECharts 数据可视化接口说明
-
-### v1.0.0 (2024-01-01)
-- 初始版本发布
-- 实现核心功能接口
-- 支持WebSocket实时推送
+- ✨ AI心电图分析后端
+- ✨ 7个REST API端点
+- ✨ 数据库表设计
 
 ---
 
-**文档维护:** CardioGuard Team  
-**联系方式:** api-support@cardioguard.com  
-**最后更新:** 2026-04-12
+<div align="center">
+
+**文档版本**: v1.3.2  
+**最后更新**: 2026-04-14  
+**维护团队**: CardioGuard Development Team
+
+</div>

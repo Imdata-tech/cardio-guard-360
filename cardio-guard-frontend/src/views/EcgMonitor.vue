@@ -282,6 +282,9 @@ const ecgParams = ref({
 
 let recordingTimer: any = null
 let ws: WebSocket | null = null
+let reconnectTimer: any = null
+const maxReconnectAttempts = 5
+let reconnectAttempts = 0
 
 // ECG 图表配置
 const ecgChartOption = computed(() => ({
@@ -362,23 +365,160 @@ const connectionText = computed(() => {
 })
 
 // 方法
-const startRecording = () => {
-  isRecording.value = true
-  recordingDuration.value = 0
+/**
+ * 建立WebSocket连接
+ */
+const connectWebSocket = () => {
+  const userId = 1 // TODO: 从用户Store获取
   
-  // 启动计时器
-  recordingTimer = setInterval(() => {
-    recordingDuration.value++
+  // WebSocket服务器地址
+  const wsUrl = `ws://localhost:8080/ws/monitor?userId=${userId}`
+  
+  try {
+    ws = new WebSocket(wsUrl)
     
-    // 模拟生成ECG数据
-    const newData = generateMockEcgData()
-    ecgData.value.push(newData)
+    ws.onopen = () => {
+      console.log('WebSocket连接成功')
+      connectionStatus.value = 'connected'
+      reconnectAttempts = 0
+      ElMessage.success('已连接到ECG监测服务')
+    }
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+        handleWebSocketMessage(message)
+      } catch (error) {
+        console.error('解析WebSocket消息失败:', error)
+      }
+    }
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket错误:', error)
+      connectionStatus.value = 'disconnected'
+      ElMessage.error('WebSocket连接错误')
+    }
+    
+    ws.onclose = (event) => {
+      console.log('WebSocket连接关闭:', event.code, event.reason)
+      connectionStatus.value = 'disconnected'
+      
+      // 尝试自动重连
+      if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+        attemptReconnect()
+      }
+    }
+  } catch (error) {
+    console.error('创建WebSocket连接失败:', error)
+    ElMessage.error('连接失败')
+  }
+}
+
+/**
+ * 处理WebSocket消息
+ */
+const handleWebSocketMessage = (message: any) => {
+  switch (message.type) {
+    case 'connected':
+      console.log('服务器响应:', message.message)
+      break
+      
+    case 'ecg-data':
+      handleEcgData(message.data)
+      break
+      
+    case 'realtime-data':
+      // 处理其他实时数据(如心率)
+      if (message.data.heartRate) {
+        currentHeartRate.value = Math.round(message.data.heartRate)
+      }
+      break
+      
+    default:
+      console.log('未知消息类型:', message.type)
+  }
+}
+
+/**
+ * 处理ECG数据点
+ */
+const handleEcgData = (data: any) => {
+  if (isRecording.value) {
+    // 添加电压值到波形数据
+    ecgData.value.push(data.voltage)
     
     // 保持最近500个数据点
     if (ecgData.value.length > 500) {
       ecgData.value.shift()
     }
-  }, 1000 / sampleRate.value)
+    
+    // 更新心率
+    if (data.heartRate) {
+      currentHeartRate.value = Math.round(data.heartRate)
+    }
+  }
+}
+
+/**
+ * 尝试重新连接
+ */
+const attemptReconnect = () => {
+  reconnectAttempts++
+  console.log(`尝试重连 (${reconnectAttempts}/${maxReconnectAttempts})...`)
+  
+  reconnectTimer = setTimeout(() => {
+    if (connectionStatus.value === 'disconnected') {
+      connectWebSocket()
+    }
+  }, 3000 * reconnectAttempts) // 指数退避
+}
+
+/**
+ * 启动ECG数据模拟(后端)
+ */
+const startSimulation = async () => {
+  try {
+    await axios.post('/api/ecg/simulation/start', null, {
+      params: { userId: 1 } // TODO: 从用户Store获取
+    })
+    ElMessage.success('ECG数据模拟已启动')
+  } catch (error: any) {
+    console.error('启动模拟失败:', error)
+    ElMessage.error(error.response?.data?.message || '启动模拟失败')
+  }
+}
+
+/**
+ * 停止ECG数据模拟(后端)
+ */
+const stopSimulation = async () => {
+  try {
+    await axios.post('/api/ecg/simulation/stop', null, {
+      params: { userId: 1 } // TODO: 从用户Store获取
+    })
+    ElMessage.info('ECG数据模拟已停止')
+  } catch (error: any) {
+    console.error('停止模拟失败:', error)
+    ElMessage.error(error.response?.data?.message || '停止模拟失败')
+  }
+}
+
+const startRecording = () => {
+  isRecording.value = true
+  recordingDuration.value = 0
+  
+  // 清除旧的定时器(如果存在)
+  if (recordingTimer) {
+    clearInterval(recordingTimer)
+  }
+  
+  // 启动计时器
+  recordingTimer = setInterval(() => {
+    recordingDuration.value++
+  }, 1000)
+  
+  // 启动后端ECG数据模拟
+  startSimulation()
   
   ElMessage.success('开始记录ECG数据')
 }
@@ -389,6 +529,10 @@ const stopRecording = () => {
     clearInterval(recordingTimer)
     recordingTimer = null
   }
+  
+  // 停止后端ECG数据模拟
+  stopSimulation()
+  
   ElMessage.info('停止记录')
 }
 
@@ -573,14 +717,22 @@ const getQualityColor = (quality: number) => {
 onMounted(() => {
   loadHistory()
   
-  // TODO: 建立WebSocket连接接收实时ECG数据
-  // connectWebSocket()
+  // 建立WebSocket连接接收实时ECG数据
+  connectWebSocket()
 })
 
 onUnmounted(() => {
   stopRecording()
+  
+  // 清理重连定时器
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+  }
+  
+  // 关闭WebSocket连接
   if (ws) {
-    ws.close()
+    ws.close(1000, '组件卸载')
+    ws = null
   }
 })
 </script>

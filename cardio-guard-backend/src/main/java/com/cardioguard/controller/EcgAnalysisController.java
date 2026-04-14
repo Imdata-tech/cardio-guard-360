@@ -3,6 +3,7 @@ package com.cardioguard.controller;
 import com.cardioguard.common.Result;
 import com.cardioguard.entity.EcgAnalysisResult;
 import com.cardioguard.service.EcgAnalysisService;
+import com.cardioguard.service.EcgSimulationService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,9 @@ public class EcgAnalysisController {
     
     @Autowired
     private EcgAnalysisService ecgAnalysisService;
+    
+    @Autowired
+    private EcgSimulationService ecgSimulationService;
     
     @PostMapping("/analyze")
     @ApiOperation("分析ECG数据")
@@ -129,6 +133,30 @@ public class EcgAnalysisController {
         } catch (Exception e) {
             log.error("获取ECG异常统计失败", e);
             return Result.error("获取ECG异常统计失败: " + e.getMessage());
+        }
+    }
+    
+    @PostMapping("/simulation/start")
+    @ApiOperation("启动ECG数据模拟")
+    public Result<String> startSimulation(@RequestParam Long userId) {
+        try {
+            ecgSimulationService.startSimulation(userId);
+            return Result.success("ECG数据模拟已启动");
+        } catch (Exception e) {
+            log.error("启动ECG模拟失败", e);
+            return Result.error("启动ECG模拟失败: " + e.getMessage());
+        }
+    }
+    
+    @PostMapping("/simulation/stop")
+    @ApiOperation("停止ECG数据模拟")
+    public Result<String> stopSimulation(@RequestParam Long userId) {
+        try {
+            ecgSimulationService.stopSimulation(userId);
+            return Result.success("ECG数据模拟已停止");
+        } catch (Exception e) {
+            log.error("停止ECG模拟失败", e);
+            return Result.error("停止ECG模拟失败: " + e.getMessage());
         }
     }
 }
