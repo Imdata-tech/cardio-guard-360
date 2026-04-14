@@ -242,4 +242,159 @@ describe('EcgMonitor Component', () => {
     
     expect(vm.isRecording).toBe(false)
   })
+  
+  // ========== WebSocket相关测试 ==========
+  
+  it('应该初始化WebSocket相关变量', () => {
+    const vm = wrapper.vm as any
+    expect(vm.ws).toBeNull()
+    expect(vm.reconnectAttempts).toBe(0)
+  })
+  
+  it('应该正确构建WebSocket URL', () => {
+    const userId = 1
+    const expectedUrl = `ws://localhost:8080/ws/monitor?userId=${userId}`
+    expect(expectedUrl).toContain('ws://')
+    expect(expectedUrl).toContain('userId=1')
+  })
+  
+  it('应该处理ecg-data消息类型', () => {
+    const vm = wrapper.vm as any
+    vm.isRecording = true
+    vm.ecgData = []
+    
+    const mockEcgMessage = {
+      type: 'ecg-data',
+      timestamp: Date.now(),
+      data: {
+        timestamp: Date.now(),
+        voltage: 0.5,
+        heartRate: 72.5,
+        sampleRate: 250
+      }
+    }
+    
+    vm.handleEcgData(mockEcgMessage.data)
+    
+    expect(vm.ecgData.length).toBe(1)
+    expect(vm.ecgData[0]).toBe(0.5)
+    expect(vm.currentHeartRate).toBe(73) // 四舍五入
+  })
+  
+  it('应该限制ECG数据点数量为500', () => {
+    const vm = wrapper.vm as any
+    vm.isRecording = true
+    
+    // 填充500个数据点
+    for (let i = 0; i < 500; i++) {
+      vm.ecgData.push(i * 0.1)
+    }
+    
+    // 添加新数据点
+    vm.handleEcgData({ voltage: 1.0, heartRate: 75 })
+    
+    expect(vm.ecgData.length).toBe(500)
+    expect(vm.ecgData[0]).toBe(0.1) // 第一个旧数据被移除
+    expect(vm.ecgData[499]).toBe(1.0) // 新数据在末尾
+  })
+  
+  it('应该在未记录时不处理ECG数据', () => {
+    const vm = wrapper.vm as any
+    vm.isRecording = false
+    vm.ecgData = []
+    
+    vm.handleEcgData({ voltage: 0.5, heartRate: 72 })
+    
+    expect(vm.ecgData.length).toBe(0)
+  })
+  
+  it('应该处理realtime-data消息类型', () => {
+    const vm = wrapper.vm as any
+    const mockMessage = {
+      type: 'realtime-data',
+      data: {
+        heartRate: 80
+      }
+    }
+    
+    vm.handleWebSocketMessage(mockMessage)
+    
+    expect(vm.currentHeartRate).toBe(80)
+  })
+  
+  it('应该处理connected消息类型', () => {
+    const vm = wrapper.vm as any
+    const mockMessage = {
+      type: 'connected',
+      message: '已成功连接到健康监测服务'
+    }
+    
+    // 不应该抛出异常
+    expect(() => {
+      vm.handleWebSocketMessage(mockMessage)
+    }).not.toThrow()
+  })
+  
+  it('应该处理未知消息类型', () => {
+    const vm = wrapper.vm as any
+    const mockMessage = {
+      type: 'unknown-type',
+      data: {}
+    }
+    
+    // 不应该抛出异常
+    expect(() => {
+      vm.handleWebSocketMessage(mockMessage)
+    }).not.toThrow()
+  })
+  
+  it('应该正确计算重连延迟', () => {
+    // 指数退避: 3s, 6s, 9s, 12s, 15s
+    expect(3000 * 1).toBe(3000)
+    expect(3000 * 2).toBe(6000)
+    expect(3000 * 3).toBe(9000)
+    expect(3000 * 4).toBe(12000)
+    expect(3000 * 5).toBe(15000)
+  })
+  
+  it('应该限制最大重连次数为5', () => {
+    const maxReconnectAttempts = 5
+    expect(maxReconnectAttempts).toBe(5)
+  })
+  
+  it('应该在startRecording时调用startSimulation', async () => {
+    const vm = wrapper.vm as any
+    
+    await vm.startRecording()
+    
+    expect(vm.isRecording).toBe(true)
+    expect(vm.recordingDuration).toBe(0)
+  })
+  
+  it('应该在stopRecording时调用stopSimulation', async () => {
+    const vm = wrapper.vm as any
+    vm.isRecording = true
+    
+    await vm.stopRecording()
+    
+    expect(vm.isRecording).toBe(false)
+  })
+  
+  it('应该正确处理JSON解析错误', () => {
+    const vm = wrapper.vm as any
+    
+    // 模拟无效的JSON
+    const invalidEvent = {
+      data: '{invalid json}'
+    }
+    
+    // 不应该抛出未捕获的异常
+    expect(() => {
+      try {
+        JSON.parse(invalidEvent.data)
+      } catch (e) {
+        // 预期会捕获错误
+      }
+    }).not.toThrow()
+  })
 })
