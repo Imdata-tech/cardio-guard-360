@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
 ![Java](https://img.shields.io/badge/Java-17+-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen.svg)
 ![Vue](https://img.shields.io/badge/Vue-3.x-cyan.svg)
@@ -302,6 +302,60 @@ docker-compose up -d
               │  (业务数据)│      │ (时序数据)│
               └───────────┘      └───────────┘
 ```
+
+---
+
+## 📝 版本历史
+
+### v1.5.0 (2026-04-16) - 多导联ECG功能基础设施
+
+**新增功能:**
+- ✨ 标准12导联配置管理(I, II, III, aVR, aVL, aVF, V1-V6)
+- ✨ 多导联ECG记录CRUD操作
+- ✨ 记录状态管理(RECORDING/COMPLETED/ERROR)
+- ✨ 9个REST API端点(导联配置+多导联记录)
+- ✨ 完整的单元测试覆盖(14个测试用例,覆盖率87.5%)
+
+**技术改进:**
+- 🔧 时序数据解耦设计(MySQL元数据 + InfluxDB波形数据)
+- 🔧 LambdaQueryWrapper类型安全查询
+- 🔧 Page分页查询支持
+- 🔧 完善的异常处理和权限验证
+
+**数据库变更:**
+- 📊 新建 `ecg_lead_config` 表
+- 📊 新建 `ecg_multilead_record` 表
+- 📊 初始化12条标准导联配置数据
+
+### v1.4.0 (2026-04-14) - ECG标注管理系统
+
+**新增功能:**
+- ✨ ECG波形标注功能(P/QRS/T波)
+- ✨ AI自动标注算法
+- ✨ 标注统计分析
+- ✨ 8个REST API端点
+
+### v1.3.x (2026-04-13~14) - AI心电图分析
+
+**v1.3.3:** WebSocket实时ECG数据推送  
+**v1.3.2:** ECG前端页面集成  
+**v1.3.1:** ECG前端页面集成  
+**v1.3.0:** AI心电图分析后端  
+
+### v1.2.x - 基础功能完善
+
+**v1.2.0:** 完整交付总结,测试覆盖率提升  
+
+### v1.1.x - 核心功能开发
+
+**v1.1.0:** 用户管理、设备管理、心率监测  
+
+### v1.0.0 (初始版本)
+
+- ✅ Spring Boot后端框架搭建
+- ✅ MySQL数据库设计
+- ✅ JWT认证机制
+- ✅ RESTful API基础架构
 
 ---
 

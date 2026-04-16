@@ -600,6 +600,493 @@ Authorization: Bearer <token>
 
 ---
 
+### 3.4 ECG导联配置管理 (v1.5.0) ✨
+
+#### 3.4.1 获取所有导联配置
+
+```http
+GET /ecg/lead-config
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "leadName": "I",
+      "leadType": "LIMB",
+      "displayColor": "#FF0000",
+      "displayOrder": 1,
+      "isDefault": 1,
+      "description": "标准肢体导联 I"
+    },
+    {
+      "id": 2,
+      "leadName": "II",
+      "leadType": "LIMB",
+      "displayColor": "#00FF00",
+      "displayOrder": 2,
+      "isDefault": 1,
+      "description": "标准肢体导联 II"
+    },
+    {
+      "id": 7,
+      "leadName": "V1",
+      "leadType": "PRECORDIAL",
+      "displayColor": "#FF1493",
+      "displayOrder": 7,
+      "isDefault": 1,
+      "description": "胸导联 V1"
+    }
+  ]
+}
+```
+
+**说明:**
+- 返回所有12个标准导联配置
+- 按displayOrder升序排列
+- 包含肢体导联(LIMB)和胸导联(PRECORDIAL)
+
+#### 3.4.2 根据名称获取导联配置
+
+```http
+GET /ecg/lead-config/{leadName}
+Authorization: Bearer <token>
+```
+
+**路径参数:**
+- `leadName`: 导联名称 (I, II, III, aVR, aVL, aVF, V1-V6)
+
+**示例:**
+```http
+GET /ecg/lead-config/II
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 2,
+    "leadName": "II",
+    "leadType": "LIMB",
+    "displayColor": "#00FF00",
+    "displayOrder": 2,
+    "isDefault": 1,
+    "description": "标准肢体导联 II"
+  }
+}
+```
+
+**错误响应 (404):**
+```json
+{
+  "code": 404,
+  "message": "导联配置不存在",
+  "data": null
+}
+```
+
+#### 3.4.3 获取默认导联配置
+
+```http
+GET /ecg/lead-config/default
+Authorization: Bearer <token>
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "leadName": "I",
+      "leadType": "LIMB",
+      "displayColor": "#FF0000",
+      "displayOrder": 1,
+      "isDefault": 1,
+      "description": "标准肢体导联 I"
+    },
+    {
+      "id": 2,
+      "leadName": "II",
+      "leadType": "LIMB",
+      "displayColor": "#00FF00",
+      "displayOrder": 2,
+      "isDefault": 1,
+      "description": "标准肢体导联 II"
+    },
+    {
+      "id": 3,
+      "leadName": "III",
+      "leadType": "LIMB",
+      "displayColor": "#0000FF",
+      "displayOrder": 3,
+      "isDefault": 1,
+      "description": "标准肢体导联 III"
+    },
+    {
+      "id": 7,
+      "leadName": "V1",
+      "leadType": "PRECORDIAL",
+      "displayColor": "#FF1493",
+      "displayOrder": 7,
+      "isDefault": 1,
+      "description": "胸导联 V1"
+    },
+    {
+      "id": 8,
+      "leadName": "V2",
+      "leadType": "PRECORDIAL",
+      "displayColor": "#32CD32",
+      "displayOrder": 8,
+      "isDefault": 1,
+      "description": "胸导联 V2"
+    },
+    {
+      "id": 9,
+      "leadName": "V3",
+      "leadType": "PRECORDIAL",
+      "displayColor": "#FFD700",
+      "displayOrder": 9,
+      "isDefault": 1,
+      "description": "胸导联 V3"
+    },
+    {
+      "id": 10,
+      "leadName": "V4",
+      "leadType": "PRECORDIAL",
+      "displayColor": "#FF6347",
+      "displayOrder": 10,
+      "isDefault": 1,
+      "description": "胸导联 V4"
+    },
+    {
+      "id": 11,
+      "leadName": "V5",
+      "leadType": "PRECORDIAL",
+      "displayColor": "#4169E1",
+      "displayOrder": 11,
+      "isDefault": 1,
+      "description": "胸导联 V5"
+    },
+    {
+      "id": 12,
+      "leadName": "V6",
+      "leadType": "PRECORDIAL",
+      "displayColor": "#8A2BE2",
+      "displayOrder": 12,
+      "isDefault": 1,
+      "description": "胸导联 V6"
+    }
+  ]
+}
+```
+
+**说明:**
+- 返回is_default=1的导联配置
+- 默认包含9个导联(I, II, III, V1-V6)
+- aVR, aVL, aVF默认为非显示状态
+
+#### 3.4.4 更新导联配置
+
+```http
+PUT /ecg/lead-config/{id}
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+  "displayColor": "#FF0000",
+  "displayOrder": 1,
+  "isDefault": 1,
+  "description": "自定义描述"
+}
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "leadName": "I",
+    "leadType": "LIMB",
+    "displayColor": "#FF0000",
+    "displayOrder": 1,
+    "isDefault": 1,
+    "description": "自定义描述"
+  }
+}
+```
+
+**说明:**
+- 仅允许修改displayColor、displayOrder、isDefault、description字段
+- leadName和leadType不可修改
+
+---
+
+### 3.5 多导联ECG记录管理 (v1.5.0) ✨
+
+#### 3.5.1 创建多导联记录
+
+```http
+POST /ecg/multilead
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+  "userId": 100,
+  "deviceId": 200,
+  "recordName": "晨间检查",
+  "leadCount": 12,
+  "sampleRate": 500,
+  "durationSeconds": 60
+}
+```
+
+**字段说明:**
+- `userId`: 用户ID (必需)
+- `deviceId`: 设备ID (必需)
+- `recordName`: 记录名称 (可选)
+- `leadCount`: 导联数量 (可选,默认12)
+- `sampleRate`: 采样率Hz (可选,默认500)
+- `durationSeconds`: 记录时长秒 (可选,默认0)
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "userId": 100,
+    "deviceId": 200,
+    "recordName": "晨间检查",
+    "leadCount": 12,
+    "sampleRate": 500,
+    "durationSeconds": 60,
+    "dataStorageId": null,
+    "status": "RECORDING",
+    "createdAt": "2026-04-16T10:30:00",
+    "updatedAt": "2026-04-16T10:30:00"
+  }
+}
+```
+
+**说明:**
+- 创建时自动设置status为"RECORDING"
+- 自动填充createdAt和updatedAt
+- dataStorageId用于关联InfluxDB中的时序数据
+
+#### 3.5.2 更新记录状态
+
+```http
+PUT /ecg/multilead/{recordId}/status?status=COMPLETED
+Authorization: Bearer <token>
+```
+
+**路径参数:**
+- `recordId`: 记录ID
+
+**查询参数:**
+- `status`: 新状态 (RECORDING/COMPLETED/ERROR)
+
+**示例:**
+```http
+PUT /ecg/multilead/1/status?status=COMPLETED
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "userId": 100,
+    "deviceId": 200,
+    "recordName": "晨间检查",
+    "leadCount": 12,
+    "sampleRate": 500,
+    "durationSeconds": 60,
+    "dataStorageId": "influx_12345",
+    "status": "COMPLETED",
+    "createdAt": "2026-04-16T10:30:00",
+    "updatedAt": "2026-04-16T10:35:00"
+  }
+}
+```
+
+**错误响应 (404):**
+```json
+{
+  "code": 404,
+  "message": "记录不存在",
+  "data": null
+}
+```
+
+**说明:**
+- RECORDING → COMPLETED: 数据采集完成
+- RECORDING → ERROR: 采集过程出错
+- 状态转换后自动更新updatedAt
+
+#### 3.5.3 查询用户记录列表
+
+```http
+GET /ecg/multilead/user/{userId}?page=1&size=20
+Authorization: Bearer <token>
+```
+
+**路径参数:**
+- `userId`: 用户ID
+
+**查询参数:**
+- `page`: 页码 (默认1)
+- `size`: 每页大小 (默认20)
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "userId": 100,
+      "deviceId": 200,
+      "recordName": "晨间检查",
+      "leadCount": 12,
+      "sampleRate": 500,
+      "durationSeconds": 60,
+      "dataStorageId": "influx_12345",
+      "status": "COMPLETED",
+      "createdAt": "2026-04-16T10:30:00",
+      "updatedAt": "2026-04-16T10:35:00"
+    },
+    {
+      "id": 2,
+      "userId": 100,
+      "deviceId": 200,
+      "recordName": "晚间检查",
+      "leadCount": 12,
+      "sampleRate": 500,
+      "durationSeconds": 30,
+      "dataStorageId": "influx_12346",
+      "status": "RECORDING",
+      "createdAt": "2026-04-16T20:00:00",
+      "updatedAt": "2026-04-16T20:00:00"
+    }
+  ]
+}
+```
+
+**说明:**
+- 返回结果按created_at降序排列
+- 用于展示用户的ECG记录历史
+- 支持分页加载
+
+#### 3.5.4 获取记录详情
+
+```http
+GET /ecg/multilead/{recordId}
+Authorization: Bearer <token>
+```
+
+**路径参数:**
+- `recordId`: 记录ID
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "userId": 100,
+    "deviceId": 200,
+    "recordName": "晨间检查",
+    "leadCount": 12,
+    "sampleRate": 500,
+    "durationSeconds": 60,
+    "dataStorageId": "influx_12345",
+    "status": "COMPLETED",
+    "createdAt": "2026-04-16T10:30:00",
+    "updatedAt": "2026-04-16T10:35:00"
+  }
+}
+```
+
+**错误响应 (404):**
+```json
+{
+  "code": 404,
+  "message": "记录不存在",
+  "data": null
+}
+```
+
+#### 3.5.5 删除记录
+
+```http
+DELETE /ecg/multilead/{recordId}?userId=100
+Authorization: Bearer <token>
+```
+
+**路径参数:**
+- `recordId`: 记录ID
+
+**查询参数:**
+- `userId`: 用户ID (用于权限验证)
+
+**响应:**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "删除成功"
+}
+```
+
+**错误响应 (403 - 无权限):**
+```json
+{
+  "code": 403,
+  "message": "记录不存在或无权限删除",
+  "data": null
+}
+```
+
+**错误响应 (404 - 记录不存在):**
+```json
+{
+  "code": 404,
+  "message": "记录不存在或无权限删除",
+  "data": null
+}
+```
+
+**说明:**
+- 删除操作会验证userId是否匹配
+- 防止用户删除他人的记录
+- 建议先确认记录归属再调用
+
+---
+
 ## 4. WebSocket实时通信
 
 ### 4.1 连接建立
@@ -852,6 +1339,52 @@ function connectWebSocket() {
 
 ## 6. 更新日志
 
+### v1.5.0 (2026-04-16)
+
+- ✨ 多导联ECG功能基础设施
+- ✨ 9个REST API端点(导联配置+多导联记录管理)
+- ✨ 标准12导联配置管理(I, II, III, aVR, aVL, aVF, V1-V6)
+- ✨ 多导联记录CRUD操作
+- ✨ 记录状态管理(RECORDING/COMPLETED/ERROR)
+- ✨ 用户权限验证机制
+- ✨ 完整的单元测试覆盖(14个测试用例)
+
+**新增API:**
+
+**导联配置管理:**
+- GET `/api/ecg/lead-config` - 获取所有导联配置
+- GET `/api/ecg/lead-config/{leadName}` - 获取指定导联配置
+- GET `/api/ecg/lead-config/default` - 获取默认导联配置
+- PUT `/api/ecg/lead-config/{id}` - 更新导联配置
+
+**多导联记录管理:**
+- POST `/api/ecg/multilead` - 创建多导联记录
+- PUT `/api/ecg/multilead/{id}/status` - 更新记录状态
+- GET `/api/ecg/multilead/user/{userId}` - 查询用户记录列表
+- GET `/api/ecg/multilead/{id}` - 获取记录详情
+- DELETE `/api/ecg/multilead/{id}` - 删除记录
+
+**数据库变更:**
+- 📊 新建 `ecg_lead_config` 表 (导联配置)
+- 📊 新建 `ecg_multilead_record` 表 (多导联记录)
+- 📊 初始化12条标准导联配置数据
+
+**技术改进:**
+- 🔧 时序数据解耦设计(MySQL元数据 + InfluxDB波形数据)
+- 🔧 LambdaQueryWrapper类型安全查询
+- 🔧 Page分页查询支持
+- 🔧 完善的异常处理和权限验证
+
+**测试覆盖:**
+- 🧪 EcgLeadConfigServiceImplTest (5个测试用例,覆盖率85%)
+- 🧪 EcgMultiLeadRecordServiceImplTest (9个测试用例,覆盖率90%)
+- 🧪 整体测试覆盖率: 87.5%
+
+**文档更新:**
+- 📚 版本发布报告_v1.5.0.md
+- 📚 数据库初始化脚本 ecg_multilead_init.sql
+- 📚 API接口规范文档更新
+
 ### v1.4.0 (2026-04-14)
 
 - ✨ ECG标注管理功能
@@ -911,8 +1444,8 @@ function connectWebSocket() {
 
 <div align="center">
 
-**文档版本**: v1.4.0  
-**最后更新**: 2026-04-14  
+**文档版本**: v1.5.0  
+**最后更新**: 2026-04-16  
 **维护团队**: CardioGuard Development Team
 
 </div>
