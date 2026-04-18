@@ -10,9 +10,28 @@ spring:
   # MySQL Configuration
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/cardioguard?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/cardioguard?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&connectTimeout=5000&socketTimeout=30000
     username: root
     password: ${DB_PASSWORD:root}
+    
+    # HikariCP连接池优化配置
+    hikari:
+      # 最小空闲连接数
+      minimum-idle: 10
+      # 最大连接池大小（根据服务器配置调整）
+      maximum-pool-size: 50
+      # 连接超时时间(毫秒)
+      connection-timeout: 30000
+      # 空闲连接超时时间(毫秒)
+      idle-timeout: 600000
+      # 连接最大生命周期(毫秒) - 30分钟
+      max-lifetime: 1800000
+      # 连接测试查询
+      connection-test-query: SELECT 1
+      # 池名称
+      pool-name: CardioGuardHikariPool
+      # 自动提交
+      auto-commit: true
     
   # Redis Configuration
   data:
@@ -24,10 +43,11 @@ spring:
       timeout: 3000ms
       lettuce:
         pool:
-          max-active: 8
+          max-active: 20
           max-wait: -1ms
-          max-idle: 8
-          min-idle: 0
+          max-idle: 10
+          min-idle: 5
+        shutdown-timeout: 100ms
 
 # MyBatis Plus Configuration
 mybatis-plus:
@@ -35,7 +55,8 @@ mybatis-plus:
   type-aliases-package: com.cardioguard.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 使用SLF4J日志实现，配合SqlPerformanceInterceptor
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       id-type: auto
@@ -60,19 +81,25 @@ jwt:
 websocket:
   endpoint: /ws/health-monitor
   allowed-origins: "*"
+  # 消息压缩（待实现）
+  compression-enabled: false
 
 # Logging Configuration
 logging:
   level:
     com.cardioguard: DEBUG
-    org.springframework.security: DEBUG
+    com.cardioguard.mapper: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    com.zaxxer.hikari: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/cardioguard.log
-    max-size: 10MB
+    max-size: 50MB
     max-history: 30
+    total-size-cap: 5GB
 
 # Swagger/OpenAPI Configuration
 springdoc:
@@ -82,3 +109,17 @@ springdoc:
     path: /swagger-ui.html
     tags-sorter: alpha
     operations-sorter: alpha
+
+# Actuator监控配置（可选）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true

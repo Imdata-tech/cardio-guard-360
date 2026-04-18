@@ -1,0 +1,59 @@
+# CardioGuard 360 JVM优化配置
+# 适用于生产环境，2GB堆内存配置
+
+# ============================================
+# 堆内存配置
+# ============================================
+-Xms2g                          # 初始堆内存2GB
+-Xmx2g                          # 最大堆内存2GB
+-XX:NewRatio=2                  # 新生代:老年代 = 1:2 (新生代约682MB, 老年代约1365MB)
+-XX:SurvivorRatio=8             # Eden:Survivor = 8:1 (Eden约546MB, 每个Survivor约68MB)
+
+# ============================================
+# G1垃圾收集器配置
+# ============================================
+-XX:+UseG1GC                    # 使用G1垃圾收集器（适合大内存、低延迟场景）
+-XX:MaxGCPauseMillis=200        # 目标最大GC停顿时间200ms
+-XX:G1HeapRegionSize=16m        # G1 Region大小16MB
+-XX:InitiatingHeapOccupancyPercent=45  # 当堆使用率达到45%时启动并发标记
+-XX:G1ReservePercent=10         # 保留10%的堆空间用于疏散失败时的对象提升
+-XX:MaxGCLiveRegionPercent=60   # 老年代存活对象占比阈值
+
+# ============================================
+# GC日志配置
+# ============================================
+-Xlog:gc*:file=/logs/gc.log:time,uptime,level,tags:filecount=5,filesize=50M
+# 生成5个文件，每个50MB，循环覆盖
+
+# ============================================
+# OOM处理
+# ============================================
+-XX:+HeapDumpOnOutOfMemoryError # OOM时自动生成堆转储文件
+-XX:HeapDumpPath=/logs/heapdump.hprof  # 堆转储文件路径
+
+# ============================================
+# 性能优化
+# ============================================
+-XX:+ParallelRefProcEnabled     # 并行引用处理，提升GC效率
+-XX:MaxTenuringThreshold=10     # 对象晋升到老年代的年龄阈值
+-XX:+AlwaysPreTouch             # JVM启动时预分配所有内存页（减少运行时页面故障）
+
+# ============================================
+# 监控和诊断
+# ============================================
+-XX:+PrintCommandLineFlags      # 打印JVM启动参数
+-XX:+UnlockDiagnosticVMOptions  # 解锁诊断选项
+
+# ============================================
+# 应用特定优化
+# ============================================
+-Djava.security.egd=file:/dev/./urandom  # 加速SecureRandom初始化
+-Dfile.encoding=UTF-8           # 默认编码UTF-8
+-Duser.timezone=Asia/Shanghai   # 时区设置
+
+# ============================================
+# 调试选项（生产环境注释掉）
+# ============================================
+# -XX:+PrintGCDetails          # 打印详细GC信息
+# -XX:+PrintGCDateStamps       # 打印GC时间戳
+# -verbose:gc                  #  verbose GC输出
